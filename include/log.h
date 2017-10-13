@@ -114,5 +114,6 @@ void write_log(const char* message) {
 }
 
 void write_error(const char* message) {
+	fprintf(log_first_p, "ERROR NO: %d - ", errno);
 	if (log_logging_enabled) write_message(message, LOG_ERROR);
 }

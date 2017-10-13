@@ -28,7 +28,6 @@ int main(void) {
 
 	/* open logs */
 	open_log();
-	write_log("This is my message.");
 
 	/* New SID for child */
 	sid = setsid();
@@ -51,7 +50,10 @@ int main(void) {
 	const conf_config* config = read_config_file();
 
 	while(1) {
-		write_log("SHOWRSS: " config->showrss " PID: " config->premiumize_id " PPIN: " config->premiumize_pin " SERIES FOLDER: " config->series_folder);
+		write_log(config->showrss);
+		write_log(config->premiumize_id);
+		write_log(config->premiumize_pin);
+		write_log(config->series_folder);
 		sleep(1);
 	}
 }
