@@ -7,7 +7,7 @@ LDIR =../lib
 
 LIBS=
 
-_DEPS = def.h log.h
+_DEPS = def.h log.h config.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 _OBJ = showiumize.o

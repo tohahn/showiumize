@@ -8,6 +8,7 @@
 
 #include "def.h"
 #include "log.h"
+#include "config.h"
 
 int main(void) {
 	pid_t pid, sid;
@@ -43,15 +44,14 @@ int main(void) {
 	}
 
 	/* Close standard file descriptors */
-	/*
 	close(STDIN_FILENO);
 	close(STDOUT_FILENO);
 	close(STDERR_FILENO);
-	*/
+
+	const conf_config* config = read_config_file();
 
 	while(1) {
-		write_log("Writing a log entry.");
-		write_error("Writing an error.");
+		write_log("SHOWRSS: " config->showrss " PID: " config->premiumize_id " PPIN: " config->premiumize_pin " SERIES FOLDER: " config->series_folder);
 		sleep(1);
 	}
 }
