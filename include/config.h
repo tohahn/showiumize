@@ -116,6 +116,8 @@ char*** extract_lines(FILE* conf_file) {
 		key_value[0][i] = strdup(token);
 
 		token = strsep(&line, CONF_KEY_VALUE_SEPARATOR);
+		char* newline = strchr(token, '\n');
+		*newline = '\0';
 		key_value[1][i] = strdup(token);
 			
 		if (strsep(&line, CONF_KEY_VALUE_SEPARATOR)) {

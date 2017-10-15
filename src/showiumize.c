@@ -9,6 +9,7 @@
 #include "def.h"
 #include "log.h"
 #include "config.h"
+#include "showrss.h"
 
 int main(void) {
 	pid_t pid, sid;
@@ -41,7 +42,7 @@ int main(void) {
 		write_error("Couldn't change working dir.");
 		exit(EXIT_FAILURE);
 	}
-
+	
 	/* Close standard file descriptors */
 	close(STDIN_FILENO);
 	close(STDOUT_FILENO);
@@ -50,10 +51,6 @@ int main(void) {
 	const conf_config* config = read_config_file();
 
 	while(1) {
-		write_log(config->showrss);
-		write_log(config->premiumize_id);
-		write_log(config->premiumize_pin);
-		write_log(config->series_folder);
-		sleep(1);
+		handle_showrss(config->showrss);
 	}
 }
