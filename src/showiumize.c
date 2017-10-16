@@ -30,6 +30,10 @@ int main(void) {
 	/* open logs */
 	open_log();
 
+	open("/dev/null", O_RDONLY);
+	open("/dev/null", O_RDWR);
+	open("/dev/null", O_RDWR);
+	
 	/* New SID for child */
 	sid = setsid();
 	if (sid < 0) {
@@ -43,14 +47,11 @@ int main(void) {
 		exit(EXIT_FAILURE);
 	}
 	
-	/* Close standard file descriptors */
-	close(STDIN_FILENO);
-	close(STDOUT_FILENO);
-	close(STDERR_FILENO);
-
 	const conf_config* config = read_config_file();
-
-	while(1) {
+	
+	unsigned char blub = TRUE;
+	while(blub) {
 		handle_showrss(config->showrss);
+		blub = FALSE;
 	}
 }

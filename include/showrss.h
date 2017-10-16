@@ -7,11 +7,12 @@
 
 #define RSS_FEED_TEMPLATE "https://showrss.info/user/%s.rss"
 #define RSS_FILE_TEMPLATE "./%s.rss"
-#define RSS_LINK "<link>"
 #define RSS_SHOW_ID "<tv:show_id>"
 #define RSS_EPISODE_ID "<tv:external_id>"
+#define RSS_MAGNET_LINK "<enclosure url=\""
 #define RSS_START_CHAR '>'
 #define RSS_END_CHAR '<'
+#define RSS_MAGNET_CHAR '"'
 
 typedef struct feed_entry {
 	const char* magnet;
@@ -32,10 +33,10 @@ void handle_showrss(const char* id) {
 }
 
 FILE* download_feed(const char* id) {
-	char* feed_url = malloc(sizeof(RSS_FEED_TEMPLATE) + sizeof(id));
+	char* feed_url = malloc(sizeof(RSS_FEED_TEMPLATE) + sizeof(id) + 1);
 	sprintf(feed_url, RSS_FEED_TEMPLATE, id);
 
-	char* feed_filename = malloc(sizeof(RSS_FILE_TEMPLATE) + sizeof(id));
+	char* feed_filename = malloc(sizeof(RSS_FILE_TEMPLATE) + sizeof(id) + 1);
 	sprintf(feed_filename, RSS_FILE_TEMPLATE, id);
 	
 	FILE* feed_file;
@@ -48,9 +49,7 @@ FILE* download_feed(const char* id) {
 	CURL* curl;
 	CURLcode res;
 	
-	write_log("Came before curl global init");
 	res = curl_global_init(CURL_GLOBAL_ALL);
-	write_error("Finished global init");
 
 	curl = curl_easy_init();
 	if (curl) {
@@ -64,8 +63,6 @@ FILE* download_feed(const char* id) {
 
 		curl_easy_cleanup(curl);
 	}
-	
-	write_log("Curl cleanup.");
 
 	curl_global_cleanup();
 
@@ -81,70 +78,66 @@ FILE* download_feed(const char* id) {
 
 feed_entry** read_entries_from_feed(FILE* feed_file) {
 	feed_entry** feed_entries = NULL;
-	char* line = NULL;
+	char* temp_line = NULL;
 	size_t len = 0;
 	ssize_t read;
 
-	while (1) {
-		read = getline(&line, &len, feed_file);
-		if (read == -1) {
-			free(line);
-			break;
-		}
+	read = getline(&temp_line, &len, feed_file);
+	if (read == -1) {
+		write_error("Feed contains no items.");
+		free(temp_line);
+		exit(EXIT_FAILURE);
+	}
+
+	//copy line to local storage, so we don't have to worry about memory
+	char array_line[strlen(temp_line)];
+	memcpy(array_line, temp_line, strlen(temp_line) * sizeof(char));
+	free(temp_line);
+	array_line[strlen(temp_line)] = '\0';
+	char* line = &array_line[0];
+
+	while ((line = strstr((const char*) line, RSS_SHOW_ID))) {
+		//extract show id
+		char* start = strchr(line + 1, RSS_START_CHAR) + 1;
+		char* end = strchr(start, RSS_END_CHAR);
+		char show_id_string[end - start + 1];
+		memcpy(show_id_string, start, end - start);
+		show_id_string[end - start] = '\0';	
+
+		int show_id = atoi((const char*) show_id_string);
+
+		if (!(line = strstr((const char*) line, RSS_EPISODE_ID))) {
+			write_error("Premature end of feed file.");
+			exit(EXIT_FAILURE);
+		}			
+
+		//extract episode id
+		start = strchr(line, RSS_START_CHAR) + 1;
+		end = strchr(start, RSS_END_CHAR);
+		char episode_id_string[end - start + 1];
+		memcpy(episode_id_string, start, end - start);
+		episode_id_string[end - start] = '\0';
+
+		int episode_id = atoi((const char*) episode_id_string);
 		
-		if (strstr(line, RSS_LINK)) {
-			//extract magnet link
-			char* start = strchr(line, RSS_START_CHAR) + 1;
-			char* end = strchr(start, RSS_END_CHAR);
-			char* magnet_link = malloc(end - start + 1);
-			memcpy(magnet_link, start, end - start);
-			magnet_link[end - start] = '\0';
-			write_log(magnet_link);
-			free(line);
+		if (!(line = strstr((const char*) line, RSS_MAGNET_LINK))) {
+			write_error("Premature end of feed file.");
+			exit(EXIT_FAILURE);
+		}
 
-			while (!strstr(line, RSS_SHOW_ID)) {
-				if (getline(&line, &len, feed_file) == -1) {
-					write_error("Premature end of feed file.");
-					exit(EXIT_FAILURE);
-				}
-				free(line);
-			}			
-			//extract show id
-			start = strchr(line, RSS_START_CHAR) + 1;
-			end = strchr(start, RSS_END_CHAR);
-			char* show_id_string[end - start + 1];
-			memcpy(show_id_string, start, end - start);
-			show_id_string[end - start] = '\0';
-			
-			write_log((const char*) show_id_string);
-			int show_id = atoi((const char*) show_id_string);
-			free(line);
+		//extract magnet link
+		start = strchr(line, RSS_MAGNET_CHAR) + 1;
+		end = strchr(start, RSS_MAGNET_CHAR);
+		char* magnet_link = malloc((end - start + 1) * sizeof(char));
+		memcpy(magnet_link, start, (end - start) * sizeof(char));
+		magnet_link[end - start] = '\0';
 
-			while (!strstr(line, RSS_EPISODE_ID)) {
-				if (getline(&line, &len, feed_file) == -1) {
-					write_error("Premature end of feed file.");
-					exit(EXIT_FAILURE);
-				}
-				free(line);
-			}			
-			//extract episode id
-			start = strchr(line, RSS_START_CHAR) + 1;
-			end = strchr(start, RSS_END_CHAR);
-			char episode_id_string[end - start + 1];
-			memcpy(episode_id_string, start, end - start);
-			episode_id_string[end - start] = '\0';
-			
-			write_log(episode_id_string);
-			int episode_id = atoi((const char*) episode_id_string);
-			
-			//create entry for feed entry
-			feed_entries = realloc(feed_entries, (sizeof(feed_entries) + 1) * sizeof(feed_entry*));
-			feed_entries[sizeof(feed_entries)] = malloc(sizeof(feed_entry*));
-			feed_entries[sizeof(feed_entries)]->magnet = magnet_link;
-			feed_entries[sizeof(feed_entries)]->show_id = show_id;
-			feed_entries[sizeof(feed_entries)]->episode_id = episode_id;
-			free(line);
-		}	
+		//create entry for feed entry
+		feed_entries = realloc(feed_entries, (sizeof(feed_entries) + 1) * sizeof(feed_entry*));
+		feed_entries[sizeof(feed_entries)] = malloc(sizeof(feed_entry*));
+		feed_entries[sizeof(feed_entries)]->magnet = magnet_link;
+		feed_entries[sizeof(feed_entries)]->show_id = show_id;
+		feed_entries[sizeof(feed_entries)]->episode_id = episode_id;
 	}
 
 	if (fclose(feed_file)) {
