@@ -4,32 +4,43 @@
 #include <stdio.h>
 #include <string.h>
 #include <curl/curl.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define RSS_FEED_TEMPLATE "https://showrss.info/user/%s.rss"
 #define RSS_FILE_TEMPLATE "./%s.rss"
+#define RSS_DIR "./showRSS/"
 #define RSS_SHOW_ID "<tv:show_id>"
 #define RSS_EPISODE_ID "<tv:external_id>"
+#define RSS_SHOW_NAME "<tv:show_name>"
 #define RSS_MAGNET_LINK "<enclosure url=\""
 #define RSS_START_CHAR '>'
 #define RSS_END_CHAR '<'
 #define RSS_MAGNET_CHAR '"'
 
 typedef struct feed_entry {
-	const char* magnet;
 	int show_id;
 	int episode_id;
+	char* show_name;
+	char* magnet;
 } feed_entry;
 
 void handle_showrss(const char* id);
 FILE* download_feed(const char* id);
 feed_entry** read_entries_from_feed(FILE* feed_file);
+feed_entry** read_entries_from_dir();
+int rss_extract_number(char* line, const char* tag);
+char* rss_extract_string(char* line, const char* tag, const char start_char, const char end_char);
+feed_entry** rss_add_entry_to_array(feed_entry** entries, int show_id, int episode_id, char* show_name, char* magnet_link);
 
 void handle_showrss(const char* id) {
 	write_log("Downloading feed.");
 	FILE* feed_file = download_feed(id);
-	write_log("Reading it.");
+	write_log("Reading feed.");
 	feed_entry** feed_items = read_entries_from_feed(feed_file);
-	write_log(feed_items[sizeof(feed_items)]->magnet);
+	write_log("Reading dir.");
+	feed_entry** dir_items = read_entries_from_dir();
 }
 
 FILE* download_feed(const char* id) {
@@ -90,54 +101,21 @@ feed_entry** read_entries_from_feed(FILE* feed_file) {
 	}
 
 	//copy line to local storage, so we don't have to worry about memory
-	char array_line[strlen(temp_line)];
+	char array_line[strlen(temp_line) + 1];
 	memcpy(array_line, temp_line, strlen(temp_line) * sizeof(char));
-	free(temp_line);
 	array_line[strlen(temp_line)] = '\0';
+	free(temp_line);
 	char* line = &array_line[0];
-
+	
 	while ((line = strstr((const char*) line, RSS_SHOW_ID))) {
-		//extract show id
-		char* start = strchr(line + 1, RSS_START_CHAR) + 1;
-		char* end = strchr(start, RSS_END_CHAR);
-		char show_id_string[end - start + 1];
-		memcpy(show_id_string, start, end - start);
-		show_id_string[end - start] = '\0';	
-
-		int show_id = atoi((const char*) show_id_string);
-
-		if (!(line = strstr((const char*) line, RSS_EPISODE_ID))) {
-			write_error("Premature end of feed file.");
-			exit(EXIT_FAILURE);
-		}			
-
-		//extract episode id
-		start = strchr(line, RSS_START_CHAR) + 1;
-		end = strchr(start, RSS_END_CHAR);
-		char episode_id_string[end - start + 1];
-		memcpy(episode_id_string, start, end - start);
-		episode_id_string[end - start] = '\0';
-
-		int episode_id = atoi((const char*) episode_id_string);
+		int show_id = rss_extract_number(line, RSS_SHOW_ID);
+		int episode_id = rss_extract_number(line, RSS_EPISODE_ID);
+		char* show_name = rss_extract_string(line, RSS_SHOW_NAME, RSS_START_CHAR, RSS_END_CHAR);
+		char* magnet_link = rss_extract_string(line, RSS_MAGNET_LINK, RSS_MAGNET_CHAR, RSS_MAGNET_CHAR);
 		
-		if (!(line = strstr((const char*) line, RSS_MAGNET_LINK))) {
-			write_error("Premature end of feed file.");
-			exit(EXIT_FAILURE);
-		}
-
-		//extract magnet link
-		start = strchr(line, RSS_MAGNET_CHAR) + 1;
-		end = strchr(start, RSS_MAGNET_CHAR);
-		char* magnet_link = malloc((end - start + 1) * sizeof(char));
-		memcpy(magnet_link, start, (end - start) * sizeof(char));
-		magnet_link[end - start] = '\0';
-
-		//create entry for feed entry
-		feed_entries = realloc(feed_entries, (sizeof(feed_entries) + 1) * sizeof(feed_entry*));
-		feed_entries[sizeof(feed_entries)] = malloc(sizeof(feed_entry*));
-		feed_entries[sizeof(feed_entries)]->magnet = magnet_link;
-		feed_entries[sizeof(feed_entries)]->show_id = show_id;
-		feed_entries[sizeof(feed_entries)]->episode_id = episode_id;
+		feed_entries = rss_add_entry_to_array(feed_entries, show_id, episode_id, show_name, magnet_link);
+		
+		line += 1;
 	}
 
 	if (fclose(feed_file)) {
@@ -148,4 +126,65 @@ feed_entry** read_entries_from_feed(FILE* feed_file) {
 	return feed_entries;
 }
 
+feed_entry** read_entries_from_dir() {
+	if(access(RSS_DIR, R_OK | W_OK)) {
+		write_log("./showRSS/ does not exist, creating it for further use.");
+		if(mkdir(RSS_DIR, S_IRWXU | S_IRG | S_IROTH | S_IXOTH)) {
+			write_error("Could not create ./showRSS/. Missing permissions?");
+			exit(EXIT_FAILURE);
+		}
+		return NULL;
+	}
+
+	DIR* show_dir;
+	if (!(show_dir = opendir(RSS_DIR))) {
+		write_error("Could not open ./showRSS/. Exiting.");
+		exit(EXIT_FAILURE);
+	}
+
+}
+
+int rss_extract_number(char* line, const char* tag) {
+	if (!(line = strstr((const char*) line, tag))) {
+		write_error("Premature end of feed file.");
+		exit(EXIT_FAILURE);
+	}			
+
+	char* start = strchr(line, RSS_START_CHAR) + 1;
+	char* end = strchr(start, RSS_END_CHAR);
+	char number_string[end - start + 1];
+	memcpy(number_string, start, end - start);
+	number_string[end - start] = '\0';
+
+	return atoi((const char*) number_string);
+}
+
+char* rss_extract_string(char* line, const char* tag, const char start_char, const char end_char) {
+	if (!(line = strstr((const char*) line, tag))) {
+		write_error("Premature end of feed file.");
+		exit(EXIT_FAILURE);
+	}
+
+	char* start = strchr(line, start_char) + 1;
+	char* end = strchr(start, end_char);
+	char* rss_string = malloc((end - start + 1) * sizeof(char));
+	memcpy(rss_string, start, (end - start) * sizeof(char));
+	rss_string[end - start] = '\0';
+
+	return rss_string;
+}
+
+feed_entry** rss_add_entry_to_array(feed_entry** entries, int show_id, int episode_id, char* show_name, char* magnet_link) {
+	size_t new_size = sizeof(entries) + 1;
+	
+	entries = realloc(entries, (new_size * sizeof(feed_entry*)));
+	entries[--new_size] = malloc(sizeof(feed_entry));
+	
+	entries[new_size]->show_id = show_id;
+	entries[new_size]->episode_id = episode_id;
+	entries[new_size]->show_name = show_name;
+	entries[new_size]->magnet = magnet_link;
+
+	return entries;
+}
 #endif
