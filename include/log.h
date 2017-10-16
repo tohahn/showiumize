@@ -1,3 +1,6 @@
+#ifndef LOG_H
+#define LOG_H
+
 #include <sys/types.h>
 #include <stdio.h>
 #include <time.h>
@@ -117,3 +120,5 @@ void write_error(const char* message) {
 	fprintf(log_first_p, "ERROR NO: %d - ", errno);
 	if (log_logging_enabled) write_message(message, LOG_ERROR);
 }
+
+#endif

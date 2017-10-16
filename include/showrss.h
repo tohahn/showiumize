@@ -1,3 +1,6 @@
+#ifndef SHOWRSS_H
+#define SHOWRSS_H
+
 #include <stdio.h>
 #include <string.h>
 #include <curl/curl.h>
@@ -21,8 +24,10 @@ FILE* download_feed(const char* id);
 feed_entry** read_entries_from_feed(FILE* feed_file);
 
 void handle_showrss(const char* id) {
-	write_log("Downloading feed and reading it.");
-	feed_entry** feed_items = read_entries_from_feed(download_feed(id));
+	write_log("Downloading feed.");
+	FILE* feed_file = download_feed(id);
+	write_log("Reading it.");
+	feed_entry** feed_items = read_entries_from_feed(feed_file);
 	write_log(feed_items[sizeof(feed_items)]->magnet);
 }
 
@@ -149,3 +154,5 @@ feed_entry** read_entries_from_feed(FILE* feed_file) {
 
 	return feed_entries;
 }
+
+#endif

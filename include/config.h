@@ -1,3 +1,6 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -176,3 +179,5 @@ unsigned char change_config_dir() {
 	free(temp_dir);
 	return TRUE;
 }
+
+#endif
