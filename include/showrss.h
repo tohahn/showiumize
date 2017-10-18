@@ -18,31 +18,166 @@
 #define RSS_MAGNET_LINK "<enclosure url=\""
 #define RSS_START_CHAR '>'
 #define RSS_END_CHAR '<'
-#define RSS_MAGNET_CHAR '"'
+#define RSS_MAGNET_START_CHAR '"'
+#define RSS_MAGNET_END_CHAR '&'
 
 typedef struct feed_entry {
 	int show_id;
-	int episode_id;
 	char* show_name;
+	int episode_id;
 	char* magnet;
 } feed_entry;
 
-void handle_showrss(const char* id);
+feed_entry** handle_showrss(const char* id);
 FILE* download_feed(const char* id);
 feed_entry** read_entries_from_feed(FILE* feed_file);
 feed_entry** read_entries_from_dir(void);
 int rss_extract_number(char* line, const char* tag);
 char* rss_extract_string(char* line, const char* tag, const char start_char, const char end_char);
-feed_entry** rss_add_entry_to_array(feed_entry** entries, int show_id, int episode_id, char* show_name, char* magnet_link);
+feed_entry** rss_add_entry_to_array(feed_entry** entries, size_t size, int show_id, char* show_name, int episode_id, char* magnet_link);
 char* readline(FILE* feed_file);
+feed_entry** compare_entries(feed_entry** feed_items, feed_entry** dir_items);
+void free_array(feed_entry** tofree);
+void write_entries_to_dir(feed_entry** feed_items);
+feed_entry** copy_entry_array(feed_entry** tocopy);
+feed_entry** null_terminate_array(feed_entry** toterminate, size_t size);
+feed_entry** copy_entry(feed_entry** entries, size_t size, int show_id, char* show_name, int episode_id, char* magnet_link);
 
-void handle_showrss(const char* id) {
+feed_entry** null_terminate_array(feed_entry** toterminate, size_t size) {
+	if (!toterminate || size < 1) {
+		return NULL;
+	}
+
+	toterminate = realloc(toterminate, (size + 1) * sizeof(feed_entry*));
+	toterminate[size] = NULL;
+
+	return toterminate;
+}
+
+feed_entry** handle_showrss(const char* id) {
 	write_log("Downloading feed.");
 	FILE* feed_file = download_feed(id);
+	
 	write_log("Reading feed.");
 	feed_entry** feed_items = read_entries_from_feed(feed_file);
+	
 	write_log("Reading dir.");
 	feed_entry** dir_items = read_entries_from_dir();
+	
+	write_log("Check unread.");
+	feed_entry** unread;
+	unread = compare_entries(feed_items, dir_items);
+
+	write_log("Write entries from feed.");
+	write_entries_to_dir(feed_items);
+
+	write_log("Free arrays.");
+	free_array(feed_items);
+	free_array(dir_items);
+
+	return unread;
+}	
+
+void write_entries_to_dir(feed_entry** feed_items) {
+	size_t index = 0;
+	feed_entry* curr;
+	while ((curr = feed_items[index++])) {
+		char* filename = malloc(20 * sizeof(char));
+		sprintf(filename, "./%d%d", curr->show_id, curr->episode_id);
+		FILE* temp_file;
+		
+		if (!(temp_file = fopen(filename, "w"))) {
+			write_error("Couldn't open feed entry file in showRSS directory.");
+			exit(EXIT_FAILURE);
+		}
+		fprintf(temp_file, "%d\n", curr->show_id);
+		fprintf(temp_file, "%s\n", curr->show_name);
+		fprintf(temp_file, "%d\n", curr->episode_id);
+		fprintf(temp_file, "%s\n", curr->magnet);
+		
+		if (fclose(temp_file)) {
+			write_error("Could not close feed entry file in showRSS directory.");
+			exit(EXIT_FAILURE);
+		}
+		
+		free(filename);
+	}
+}
+
+void free_array(feed_entry** tofree) {
+	size_t index = 0;
+	feed_entry* curr;;
+	while ((curr = tofree[index++])) {
+		free(curr->show_name);
+		free(curr->magnet);
+		free(curr);
+	}
+	free(tofree);
+}
+
+feed_entry** compare_entries(feed_entry** feed_items, feed_entry** dir_items) {
+	if (!feed_items) {
+		return NULL;
+	}
+	feed_entry** unread = NULL;
+	if (!dir_items) {
+		return copy_entry_array(feed_items);
+	}
+	
+	size_t count = 0;
+	size_t index1 = 0;
+	feed_entry* f_cur;
+	while ((f_cur = feed_items[index1++])) {
+		unsigned char is_unread = TRUE;
+
+		size_t index2 = 0;
+		feed_entry* d_cur;
+		while ((d_cur = dir_items[index2++])) {
+			write_log(f_cur->magnet);
+			write_log(d_cur->magnet);
+			if (!strcmp(f_cur->magnet, d_cur->magnet)) {
+				is_unread = FALSE;
+			}
+		}
+		if (is_unread) {
+			unread = rss_add_entry_to_array(unread, ++count, f_cur->show_id, f_cur->show_name, f_cur->episode_id, f_cur->magnet);
+		}
+	}
+
+	return null_terminate_array(unread, count);
+}
+
+feed_entry** copy_entry_array(feed_entry** tocopy) {
+	feed_entry** copy = NULL;
+	size_t centries = 0;
+
+	size_t index = 0;
+	feed_entry* cur;
+	while ((cur = tocopy[index++])) {
+		copy = copy_entry(copy, ++centries, cur->show_id, cur->show_name, cur->episode_id, cur->magnet);
+	}
+	return null_terminate_array(copy, centries);
+}
+
+feed_entry** copy_entry(feed_entry** entries, size_t size, int show_id, char* show_name, int episode_id, char* magnet_link) {
+	entries = realloc(entries, size * sizeof(feed_entry*));
+	entries[--size] = malloc(sizeof(feed_entry));
+	
+	entries[size]->show_id = show_id;
+
+	size_t len = strlen(show_name);
+	entries[size]->show_name = malloc((len + 1) * sizeof(char));
+	memcpy(entries[size]->show_name, show_name, len * sizeof(char));
+	entries[size]->show_name[len] = '\0';
+
+	entries[size]->episode_id = episode_id;
+	
+	len = strlen(magnet_link);
+	entries[size]->magnet = malloc((len + 1) * sizeof(char));
+	memcpy(entries[size]->magnet, magnet_link, len * sizeof(char));
+	entries[size]->magnet[len] = '\0';
+
+	return entries;
 }
 
 FILE* download_feed(const char* id) {
@@ -108,24 +243,26 @@ feed_entry** read_entries_from_feed(FILE* feed_file) {
 	array_line[strlen(temp_line)] = '\0';
 	free(temp_line);
 	char* line = &array_line[0];
+	size_t count = 0;
 	
 	while ((line = strstr((const char*) line, RSS_SHOW_ID))) {
 		int show_id = rss_extract_number(line, RSS_SHOW_ID);
-		int episode_id = rss_extract_number(line, RSS_EPISODE_ID);
 		char* show_name = rss_extract_string(line, RSS_SHOW_NAME, RSS_START_CHAR, RSS_END_CHAR);
-		char* magnet_link = rss_extract_string(line, RSS_MAGNET_LINK, RSS_MAGNET_CHAR, RSS_MAGNET_CHAR);
+		int episode_id = rss_extract_number(line, RSS_EPISODE_ID);
+		char* magnet_link = rss_extract_string(line, RSS_MAGNET_LINK, RSS_MAGNET_START_CHAR, RSS_MAGNET_END_CHAR);
 		
-		feed_entries = rss_add_entry_to_array(feed_entries, show_id, episode_id, show_name, magnet_link);
-		
+		feed_entries = rss_add_entry_to_array(feed_entries, ++count, show_id, show_name, episode_id, magnet_link);
+
 		line += 1;
 	}
+	
 
 	if (fclose(feed_file)) {
 		write_error("Feed file could not be closed. Exiting.");
 		exit(EXIT_FAILURE);
 	}
 
-	return feed_entries;
+	return null_terminate_array(feed_entries, count);
 }
 
 feed_entry** read_entries_from_dir() {
@@ -150,6 +287,7 @@ feed_entry** read_entries_from_dir() {
 	feed_entry** dir_entries = NULL;
 	FILE* curr_entry_file;
 	char* filename;
+	size_t count = 0;
 	while ((curr_entry = readdir(show_dir))) {
 		if (!strcmp(curr_entry->d_name, ".") || !strcmp(curr_entry->d_name, "..")) {
 			continue;
@@ -166,6 +304,10 @@ feed_entry** read_entries_from_dir() {
 		free(line);
 
 		line = readline(curr_entry_file);
+		*strchr(line, '\n') = '\0';
+		char* show_name = line;
+
+		line = readline(curr_entry_file);
 		int episode_id = atoi(line);
 		free(line);
 		
@@ -173,13 +315,8 @@ feed_entry** read_entries_from_dir() {
 		*strchr(line, '\n') = '\0';
 		char* magnet = line;
 		
-		line = readline(curr_entry_file);
-		*strchr(line, '\n') = '\0';
-		char* show_name = line;
+		dir_entries = rss_add_entry_to_array(dir_entries, ++count, show_id, show_name, episode_id, magnet);
 
-		dir_entries = rss_add_entry_to_array(dir_entries, show_id, episode_id, magnet, show_name);
-		
-		free(filename);
 		if (fclose(curr_entry_file)) {
 			write_error("Couldn't close entry file. Exiting.");
 			exit(EXIT_FAILURE);
@@ -187,7 +324,7 @@ feed_entry** read_entries_from_dir() {
 	}
 	closedir(show_dir);
 
-	return dir_entries;
+	return null_terminate_array(dir_entries, count);
 }
 
 char* readline(FILE* feed_file) {
@@ -213,7 +350,7 @@ int rss_extract_number(char* line, const char* tag) {
 	char* start = strchr(line, RSS_START_CHAR) + 1;
 	char* end = strchr(start, RSS_END_CHAR);
 	char number_string[end - start + 1];
-	memcpy(number_string, start, end - start);
+	memcpy(number_string, start, (size_t) end - (size_t) start);
 	number_string[end - start] = '\0';
 
 	return atoi((const char*) number_string);
@@ -227,28 +364,21 @@ char* rss_extract_string(char* line, const char* tag, const char start_char, con
 
 	char* start = strchr(line, start_char) + 1;
 	char* end = strchr(start, end_char);
-	char* rss_string = malloc((end - start + 1) * sizeof(char));
-	memcpy(rss_string, start, (end - start) * sizeof(char));
+	char* rss_string = malloc((size_t)(end - start + 1) * sizeof(char));
+	memcpy(rss_string, start, (size_t)(end - start) * sizeof(char));
 	rss_string[end - start] = '\0';
 
 	return rss_string;
 }
 
-feed_entry** rss_add_entry_to_array(feed_entry** entries, int show_id, int episode_id, char* show_name, char* magnet_link) {
-	size_t new_size;
-	if (entries == NULL) {
-		new_size = 1;
-	} else {
-		new_size = sizeof(entries) + 1;
-	}
-
-	entries = realloc(entries, (new_size * sizeof(feed_entry*)));
-	entries[--new_size] = malloc(sizeof(feed_entry));
+feed_entry** rss_add_entry_to_array(feed_entry** entries, size_t size, int show_id, char* show_name, int episode_id, char* magnet_link) {
+	entries = realloc(entries, size * sizeof(feed_entry*));
+	entries[--size] = malloc(sizeof(feed_entry));
 	
-	entries[new_size]->show_id = show_id;
-	entries[new_size]->episode_id = episode_id;
-	entries[new_size]->show_name = show_name;
-	entries[new_size]->magnet = magnet_link;
+	entries[size]->show_id = show_id;
+	entries[size]->show_name = show_name;
+	entries[size]->episode_id = episode_id;
+	entries[size]->magnet = magnet_link;
 
 	return entries;
 }
