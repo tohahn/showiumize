@@ -10,6 +10,7 @@
 
 #define RSS_FEED_TEMPLATE "https://showrss.info/user/%s.rss"
 #define RSS_FILE_TEMPLATE "./%s.rss"
+#define RSS_FEED_FILE "./%s"
 #define RSS_DIR "./showRSS/"
 #define RSS_SHOW_ID "<tv:show_id>"
 #define RSS_EPISODE_ID "<tv:external_id>"
@@ -29,10 +30,11 @@ typedef struct feed_entry {
 void handle_showrss(const char* id);
 FILE* download_feed(const char* id);
 feed_entry** read_entries_from_feed(FILE* feed_file);
-feed_entry** read_entries_from_dir();
+feed_entry** read_entries_from_dir(void);
 int rss_extract_number(char* line, const char* tag);
 char* rss_extract_string(char* line, const char* tag, const char start_char, const char end_char);
 feed_entry** rss_add_entry_to_array(feed_entry** entries, int show_id, int episode_id, char* show_name, char* magnet_link);
+char* readline(FILE* feed_file);
 
 void handle_showrss(const char* id) {
 	write_log("Downloading feed.");
@@ -129,7 +131,7 @@ feed_entry** read_entries_from_feed(FILE* feed_file) {
 feed_entry** read_entries_from_dir() {
 	if(access(RSS_DIR, R_OK | W_OK)) {
 		write_log("./showRSS/ does not exist, creating it for further use.");
-		if(mkdir(RSS_DIR, S_IRWXU | S_IRG | S_IROTH | S_IXOTH)) {
+		if(mkdir(RSS_DIR, S_IRWXU | S_IRGRP | S_IROTH | S_IXOTH)) {
 			write_error("Could not create ./showRSS/. Missing permissions?");
 			exit(EXIT_FAILURE);
 		}
@@ -142,6 +144,64 @@ feed_entry** read_entries_from_dir() {
 		exit(EXIT_FAILURE);
 	}
 
+	chdir(RSS_DIR);
+	
+	struct dirent* curr_entry;
+	feed_entry** dir_entries = NULL;
+	FILE* curr_entry_file;
+	char* filename;
+	while ((curr_entry = readdir(show_dir))) {
+		if (!strcmp(curr_entry->d_name, ".") || !strcmp(curr_entry->d_name, "..")) {
+			continue;
+		}
+		filename = malloc((strlen(curr_entry->d_name) + 3) * sizeof(char));
+		sprintf(filename, RSS_FEED_FILE, curr_entry->d_name);
+		if (!(curr_entry_file = fopen(filename, "r"))) {
+			write_error("Could not open entry file for reading.");
+			exit(EXIT_FAILURE);
+		}
+		
+		char* line = readline(curr_entry_file);
+		int show_id = atoi(line);
+		free(line);
+
+		line = readline(curr_entry_file);
+		int episode_id = atoi(line);
+		free(line);
+		
+		line = readline(curr_entry_file);
+		*strchr(line, '\n') = '\0';
+		char* magnet = line;
+		
+		line = readline(curr_entry_file);
+		*strchr(line, '\n') = '\0';
+		char* show_name = line;
+
+		dir_entries = rss_add_entry_to_array(dir_entries, show_id, episode_id, magnet, show_name);
+		
+		free(filename);
+		if (fclose(curr_entry_file)) {
+			write_error("Couldn't close entry file. Exiting.");
+			exit(EXIT_FAILURE);
+		}
+	}
+	closedir(show_dir);
+
+	return dir_entries;
+}
+
+char* readline(FILE* feed_file) {
+	size_t len = 0;
+	char* line = NULL;
+	ssize_t read = getline(&line, &len, feed_file);
+	
+	if (read == -1) {
+		write_error("File malformed.");
+		free(line);
+		exit(EXIT_FAILURE);
+	}
+
+	return line;
 }
 
 int rss_extract_number(char* line, const char* tag) {
@@ -175,8 +235,13 @@ char* rss_extract_string(char* line, const char* tag, const char start_char, con
 }
 
 feed_entry** rss_add_entry_to_array(feed_entry** entries, int show_id, int episode_id, char* show_name, char* magnet_link) {
-	size_t new_size = sizeof(entries) + 1;
-	
+	size_t new_size;
+	if (entries == NULL) {
+		new_size = 1;
+	} else {
+		new_size = sizeof(entries) + 1;
+	}
+
 	entries = realloc(entries, (new_size * sizeof(feed_entry*)));
 	entries[--new_size] = malloc(sizeof(feed_entry));
 	
