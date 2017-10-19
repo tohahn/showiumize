@@ -7,7 +7,7 @@ LDIR =../lib
 
 LIBS=-lcurl
 
-_DEPS = def.h log.h config.h showrss.h
+_DEPS = def.h log.h config.h showrss.h premiumize.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 _OBJ = showiumize.o

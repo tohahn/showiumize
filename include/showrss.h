@@ -37,7 +37,7 @@ char* rss_extract_string(char* line, const char* tag, const char start_char, con
 feed_entry** rss_add_entry_to_array(feed_entry** entries, size_t size, int show_id, char* show_name, int episode_id, char* magnet_link);
 char* readline(FILE* feed_file);
 feed_entry** compare_entries(feed_entry** feed_items, feed_entry** dir_items);
-void free_array(feed_entry** tofree);
+void rss_free_array(feed_entry** tofree);
 void write_entries_to_dir(feed_entry** feed_items);
 feed_entry** copy_entry_array(feed_entry** tocopy);
 feed_entry** null_terminate_array(feed_entry** toterminate, size_t size);
@@ -72,8 +72,13 @@ feed_entry** handle_showrss(const char* id) {
 	write_entries_to_dir(feed_items);
 
 	write_log("Free arrays.");
-	free_array(feed_items);
-	free_array(dir_items);
+	rss_free_array(feed_items);
+	rss_free_array(dir_items);
+	
+	if (chdir("..")) {
+		write_error("Couldn't change to main dir. Exiting.");
+		exit(EXIT_FAILURE);
+	}
 
 	return unread;
 }	
@@ -84,12 +89,13 @@ void write_entries_to_dir(feed_entry** feed_items) {
 	while ((curr = feed_items[index++])) {
 		char* filename = malloc(20 * sizeof(char));
 		sprintf(filename, "./%d%d", curr->show_id, curr->episode_id);
+
 		FILE* temp_file;
-		
 		if (!(temp_file = fopen(filename, "w"))) {
 			write_error("Couldn't open feed entry file in showRSS directory.");
 			exit(EXIT_FAILURE);
 		}
+		
 		fprintf(temp_file, "%d\n", curr->show_id);
 		fprintf(temp_file, "%s\n", curr->show_name);
 		fprintf(temp_file, "%d\n", curr->episode_id);
@@ -104,7 +110,8 @@ void write_entries_to_dir(feed_entry** feed_items) {
 	}
 }
 
-void free_array(feed_entry** tofree) {
+void rss_free_array(feed_entry** tofree) {
+	if (!tofree) return;
 	size_t index = 0;
 	feed_entry* curr;;
 	while ((curr = tofree[index++])) {
@@ -133,9 +140,7 @@ feed_entry** compare_entries(feed_entry** feed_items, feed_entry** dir_items) {
 		size_t index2 = 0;
 		feed_entry* d_cur;
 		while ((d_cur = dir_items[index2++])) {
-			write_log(f_cur->magnet);
-			write_log(d_cur->magnet);
-			if (!strcmp(f_cur->magnet, d_cur->magnet)) {
+			if (f_cur->show_id == d_cur->show_id && f_cur->episode_id == d_cur->episode_id) {
 				is_unread = FALSE;
 			}
 		}

@@ -10,6 +10,7 @@
 #include "log.h"
 #include "config.h"
 #include "showrss.h"
+#include "premiumize.h"
 
 int main(void) {
 	pid_t pid, sid;
@@ -51,7 +52,8 @@ int main(void) {
 	
 	unsigned char blub = TRUE;
 	while(blub) {
-		handle_showrss(config->showrss);
+		feed_entry** unread = handle_showrss(config->showrss);
+		handle_premiumize(unread, config->premiumize_pin, config->premiumize_id, config->series_folder);
 		blub = FALSE;
 	}
 }
