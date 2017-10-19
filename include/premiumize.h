@@ -16,10 +16,24 @@
 #define PREM_SUCCESS_DIR "./download/"
 #define CURR_DIR_FILE "./%s"
 #define PREM_TEMP "prem_XXXXXX"
+
 #define PREM_CREATE_LINK "https://www.premiumize.me/api/transfer/create"
 #define PREM_CREATE_DATA "customer_id=%s&pin=%s&type=torrent&src=%s"
+
+#define PREM_STATUS_LINK "https://www.premiumize.me/api/torrent/browse"
+#define PREM_STATUS_DATA "customer_id=%s&pin=%s&hash=%s"
+
+#define PREM_SUCCESS_TOKEN "\"size\":"
+#define PREM_SUCCESS_END ','
+#define PREM_LINK_TOKEN "\"url\":\""
+#define PREM_LINK_FALSE_TOKEN ".stream"
+#define PREM_LINK_END '\"'
+#define PREM_MIN_SIZE 200000000
+
+#define WGET_STRING "wget -q --content-disposition -P %s %s &"
+
 #define PREM_HASH_START "\"id\""
-#define PREM_HASH_END "\""
+#define PREM_HASH_END '\"'
 
 typedef struct restart {
 	char* show_name;
@@ -33,26 +47,35 @@ typedef struct download {
 	char* hash;
 } download;
 
-void handle_premiumize(feed_entry** to_download, const char* premiumize_pin, const char* premiumize_id, const char* series_folder);
-void handle_one_transfer(const char* show_name, const char* premiumize_pin, const char* premiumize_id, const char* magnet);
-void curl_create_transfer(FILE* temp_file, char* post_data);
-void check_existing(const char* premiumize_pin, const char* premiumize_id, const char* series_folder);
-void add_one_download(download** downloads, size_t size, char* hash, char* show_name);
-void add_one_restart(restart** restarts, size_t size, char* pin, char* id, char* show_name, char* magnet);
-void read_restart_dir(download** downloads, size_t dcount, restart** restarts, size_t rcount);
-char* copy_string_memory(char* tocopy);
+char* copy_string_memory(const char* tocopy);
+void handle_premiumize(feed_entry** to_download, char* premiumize_pin, char* premiumize_id, char* series_folder);
+void check_existing(download** downloads, size_t* dc, restart** restarts, size_t* rc, char* pin, char* id, char* series_folder);
+void free_download_array(download** tofree);
+void free_restart_array(restart** tofree);
+void write_download_dir(download** unfinished);
+download** check_transfers(download** downloads, char* id, char* pin, char* series_folder);
+unsigned char handle_one_transfer(char* show_name, char* hash, char* id, char* pin, char* series_folder);
+unsigned char start_download(char* show_name, char* line, char* series_folder);
+void read_download_dir(download** downloads, size_t* dc);
 void write_restart_dir(restart** restarts);
+void read_restart_dir(download** downloads, size_t* dc, restart** restarts, size_t* rc);
+download** null_terminate_download_array(download** toterminate, size_t size);
+restart** null_terminate_restart_array(restart** toterminate, size_t size);
+download** add_one_download(download** downloads, size_t size, char* res, char* show_name);
+restart** add_one_restart(restart** restarts, size_t size, char* pin, char* id, char* show_name, char* magnet);
+char* handle_one_download(const char* premiumize_pin, const char* premiumize_id, const char* magnet);
+void curl_create_transfer(FILE* temp_file, char* link, char* post_data);
 
-char* copy_string_memory(char* tocopy) {
+char* copy_string_memory(const char* tocopy) {
 	char* copy = malloc((strlen(tocopy) + 1) * sizeof(char));
 	
-	memcpy(copy, tocopy, strlen(tocopy, (strlen(tocopy) + 1) * sizeof(char)));
+	memcpy(copy, tocopy, (strlen(tocopy) + 1) * sizeof(char));
 	copy[strlen(tocopy)] = '\0';
 	
 	return copy;
 }
 
-void handle_premiumize(feed_entry** to_download, const char* premiumize_pin, const char* premiumize_id, const char* series_folder) {	
+void handle_premiumize(feed_entry** to_download, char* premiumize_pin, char* premiumize_id, char* series_folder) {
 	curl_global_init(CURL_GLOBAL_ALL);
 	
 	if(access(PREM_DIR, R_OK | W_OK)) {
@@ -61,33 +84,38 @@ void handle_premiumize(feed_entry** to_download, const char* premiumize_pin, con
 			write_error("Could not create ./premiumize/. Missing permissions?");
 			exit(EXIT_FAILURE);
 		}
-		return NULL;
 	}
 	chdir(PREM_DIR);
 	
 	restart** restarts = NULL;
-	size_t rcount = malloc(sizeof(size_t));
-	rcount = 0;
+	size_t* rcount = malloc(sizeof(size_t));
+	*rcount = 0;
 	download** downloads = NULL;
-	size_t dcount = malloc(sizeof(size_t));
-	dcount = 0;
+	size_t* dcount = malloc(sizeof(size_t));
+	*dcount = 0;
 
 	if (to_download) {
 		size_t index = 0;
 		feed_entry* curr;
 		
 		while ((curr = to_download[index++])) {
-			char* response = handle_one_transfer(curr->show_name, premiumize_pin, premiumize_id, curr->magnet);
+			char* response = handle_one_download(premiumize_pin, premiumize_id, curr->magnet);
 			if (response) {
-				add_one_download(downloads, ++dcount, response, copy_string_memory(curr->show_name));
-			} else {
-				add_one_restart(restarts, ++rcount, premiumize_pin, premiumize_id, copy_string_memory(curr->show_name), copy_string_memory(curr->magnet));
+				add_one_download(downloads, ++*dcount, response, copy_string_memory(curr->show_name));
 				free(response);
+			} else {
+				add_one_restart(restarts, ++*rcount, premiumize_pin, premiumize_id, copy_string_memory(curr->show_name), copy_string_memory(curr->magnet));
 			}
 		}
 	}
 	
-	check_existing(downloads, &dcount, restarts, &rcount, premiumize_pin, premiumize_id, series_folder);
+	check_existing(downloads, dcount, restarts, rcount, premiumize_pin, premiumize_id, series_folder);
+
+	free(dcount);
+	free(rcount);
+	rss_free_array(to_download);
+	free_download_array(downloads);
+	free_restart_array(restarts);
 
 	curl_global_cleanup();
 }
@@ -95,16 +123,193 @@ void handle_premiumize(feed_entry** to_download, const char* premiumize_pin, con
 void check_existing(download** downloads, size_t* dc, restart** restarts, size_t* rc, char* pin, char* id, char* series_folder) {
 	size_t dcount = *dc;
 	size_t rcount = *rc;
-	read_restart_dir(downloads, &dcount, restarts, &rcount);
-	null_terminate_restart_array(restarts, &rcount);
+	read_restart_dir(downloads,dc, restarts, rc);
+	null_terminate_restart_array(restarts, rcount);
 	write_restart_dir(restarts);
 	read_download_dir(downloads, &dcount);
-	null_terminate_download_array(downloads, &dcount);
-	char** check_transfers(downloads);
+	null_terminate_download_array(downloads, dcount);
+	download** unfinished = check_transfers(downloads, id, pin, series_folder);
+	if (unfinished) {
+		write_download_dir(unfinished);
+	}
+	free_download_array(unfinished);
 }
 
-char** check_transfers(download** downloads) {
+void free_download_array(download** tofree) {
+	if (!tofree) return;
+	size_t index = 0;
+	download* curr;;
+	while ((curr = tofree[index++])) {
+		free(curr->show_name);
+		free(curr->hash);
+		free(curr);
+	}
+	free(tofree);
+}
+
+void free_restart_array(restart** tofree) {
+	if (!tofree) return;
+	size_t index = 0;
+	restart* curr;;
+	while ((curr = tofree[index++])) {
+		free(curr->show_name);
+		free(curr->pin);
+		free(curr->id);
+		free(curr->magnet);
+		free(curr);
+	}
+	free(tofree);
+}
+
+void write_download_dir(download** unfinished) {
+	size_t index = 0;
+	download* curr;
+	while ((curr = unfinished[index++])) {
+		char* temp_name = malloc((strlen(PREM_TEMP) + 1) * sizeof(char));
+		memcpy(temp_name, PREM_TEMP, strlen(PREM_TEMP));
+		temp_name[strlen(PREM_TEMP)] = '\0';
+		FILE* temp_file = fdopen(mkstemp(temp_name), "w");
+		if (!temp_file) {
+			write_error("Couldn't open temp file for download.");
+			free(temp_name);
+		}
+		
+		fprintf(temp_file, "%s\n", curr->show_name);
+		fprintf(temp_file, "%s\n", curr->hash);
+		
+		if (fclose(temp_file)) {
+			write_error("Could not close feed entry file in showRSS directory.");
+			exit(EXIT_FAILURE);
+		}
+		
+		free(temp_name);
+	}
+	if (!chdir("../..")) {
+		write_error("Couldn't change back to premiumize dir. Exiting.");
+		exit(EXIT_FAILURE);
+	}
+}
+download** check_transfers(download** downloads, char* id, char* pin, char* series_folder) {
+	download** unfinished = NULL;
+	size_t ucount = 0;
+	download* curr;
+	size_t index = 0;
+	while ((curr = downloads[index++])) {
+		unsigned char res = handle_one_transfer(curr->show_name, curr->hash, id, pin, series_folder);
+		if (!res) {
+			add_one_download(unfinished, ++ucount, copy_string_memory(curr->hash), copy_string_memory(curr->show_name));
+		}
+	}
+	if (unfinished) {
+		null_terminate_download_array(unfinished, ucount);
+	}
+
+	return unfinished;
+}
+
+unsigned char handle_one_transfer(char* show_name, char* hash, char* id, char* pin, char* series_folder) {
+	//download status
+	char* data = malloc((strlen(PREM_STATUS_DATA) - 6 + strlen(hash) + strlen(id) + strlen(pin) + 1) * sizeof(char));
+	char* temp_name = malloc((strlen(PREM_TEMP) + 1) * sizeof(char));
+	memcpy(temp_name, PREM_TEMP, strlen(PREM_TEMP));
+	temp_name[strlen(PREM_TEMP)] = '\0';
+	FILE* temp_file = fdopen(mkstemp(temp_name), "w");
+	if (!temp_file) {
+		write_error("Couldn't open temp file for download.");
+		free(temp_name);
+	}
+	curl_create_transfer(temp_file, copy_string_memory(PREM_STATUS_LINK), data);
+
+	//read result into local storage
+	temp_file = freopen(temp_name, "r", temp_file);
+	char* temp_line = NULL;
+	size_t len = 0;
+	ssize_t read;
+	read = getline(&temp_line, &len, temp_file);
+	if (read == -1) {
+		write_error("Couldn't read results from premiumize.");
+		free(temp_line);
+		exit(EXIT_FAILURE);
+	}
+	char* line = malloc((strlen(temp_line) + 1) * sizeof(char));
+	memcpy(line, temp_line, strlen(temp_line));
+	line[strlen(temp_line)] = '\0';
+
+	//free memory, close file etc.
+	fclose(temp_file);
+	remove(temp_name);
+	free(temp_name);
+	free(temp_line);
+
+	//handle result
+	unsigned char success = FALSE;
+	char* start = NULL;
+	if ((start = strstr(line, PREM_SUCCESS_TOKEN))) {
+		success = start_download(show_name, start, series_folder);
+	}
+	free(line);
+
+	return success;
+}
+
+unsigned char start_download(char* show_name, char* line, char* series_folder) {
+	char* end = NULL;
+	while ((line = strstr(line, PREM_SUCCESS_TOKEN))) {
+		line += strlen(PREM_SUCCESS_TOKEN);
+		end = strchr(line, PREM_SUCCESS_END);
+		char* size_string = malloc((size_t)(end - line + 2) * sizeof(char));
+		memcpy(size_string, line, (size_t)(end - line + 1) * sizeof(char));
+		size_string[end - line + 1] = '\0';
+		int size = atoi(size_string);
+		free(size_string);
+
+		if (size > PREM_MIN_SIZE) {
+			break;
+		}
+	}
+	line = strstr(line, PREM_LINK_TOKEN);
+	if (strstr(line, PREM_LINK_FALSE_TOKEN)) {
+		line = strstr(line+1, PREM_LINK_TOKEN);
+	}
+	line += strlen(PREM_LINK_TOKEN);
+	end = strchr(line, PREM_LINK_END);
+	char* link_string = malloc((size_t)(end - line + 2) * sizeof(char));
+	memcpy(link_string, line, (size_t)(end - line + 1) * sizeof(char));
+	link_string[end - line + 1] = '\0';
 	
+	if(access(series_folder, R_OK | W_OK)) {
+		write_log("series folder does not exist, creating it for further use.");
+		if(mkdir(series_folder, S_IRWXU | S_IRGRP | S_IROTH | S_IXOTH)) {
+			write_error("Could not create series folder. Missing permissions?");
+			exit(EXIT_FAILURE);
+		}
+	}
+	
+	size_t size = strlen(series_folder) + strlen(show_name) + 2;
+	char* show_folder = malloc(size * sizeof(char));
+	memcpy(show_folder, series_folder, strlen(series_folder));
+	char* show_mid = show_folder+strlen(series_folder);
+	memcpy(show_mid, show_name, strlen(show_name));
+	show_folder[size-2] = '/';
+	show_folder[size-1] = '\0';
+
+	if(access(show_folder, R_OK | W_OK)) {
+		write_log("Show folder does not exist, creating it for further use.");
+		if(mkdir(show_folder, S_IRWXU | S_IRGRP | S_IROTH | S_IXOTH)) {
+			write_error("Could not create show folder. Missing permissions?");
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	char* wget_command = malloc((strlen(WGET_STRING) - 4 + strlen(show_folder) + strlen(link_string)) * sizeof(char));
+	sprintf(wget_command, WGET_STRING, show_folder, link_string);
+	popen(wget_command, "r");
+	
+	free(wget_command);
+	free(show_folder);
+	free(link_string);
+
+	return TRUE;
 }
 
 void read_download_dir(download** downloads, size_t* dc) {
@@ -115,7 +320,6 @@ void read_download_dir(download** downloads, size_t* dc) {
 			write_error("Could not create ./download/. Missing permissions?");
 			exit(EXIT_FAILURE);
 		}
-		return NULL;
 	}
 
 	DIR* download_dir;
@@ -128,7 +332,6 @@ void read_download_dir(download** downloads, size_t* dc) {
 	struct dirent* curr_entry;
 	FILE* curr_entry_file;
 	char* filename;
-	size_t count = 0;
 	while ((curr_entry = readdir(download_dir))) {
 		if (!strcmp(curr_entry->d_name, ".") || !strcmp(curr_entry->d_name, "..")) {
 			continue;
@@ -140,7 +343,7 @@ void read_download_dir(download** downloads, size_t* dc) {
 			exit(EXIT_FAILURE);
 		}
 		
-		line = readline(curr_entry_file);
+		char* line = readline(curr_entry_file);
 		*strchr(line, '\n') = '\0';
 		char* show_name = line;
 		
@@ -161,6 +364,7 @@ void read_download_dir(download** downloads, size_t* dc) {
 	}
 	closedir(download_dir);
 }
+
 void write_restart_dir(restart** restarts) {
 	size_t index = 0;
 	restart* curr;
@@ -175,8 +379,8 @@ void write_restart_dir(restart** restarts) {
 		}
 		
 		fprintf(temp_file, "%s\n", curr->show_name);
-		fprintf(temp_file, "%d\n", curr->pin);
-		fprintf(temp_file, "%d\n", curr->id);
+		fprintf(temp_file, "%s\n", curr->pin);
+		fprintf(temp_file, "%s\n", curr->id);
 		fprintf(temp_file, "%s\n", curr->magnet);
 		
 		if (fclose(temp_file)) {
@@ -184,7 +388,7 @@ void write_restart_dir(restart** restarts) {
 			exit(EXIT_FAILURE);
 		}
 		
-		free(filename);
+		free(temp_name);
 	}
 	if (!chdir("..")) {
 		write_error("Couldn't change back to premiumize dir. Exiting.");
@@ -201,7 +405,6 @@ void read_restart_dir(download** downloads, size_t* dc, restart** restarts, size
 			write_error("Could not create ./restart/. Missing permissions?");
 			exit(EXIT_FAILURE);
 		}
-		return NULL;
 	}
 
 	DIR* restart_dir;
@@ -214,7 +417,6 @@ void read_restart_dir(download** downloads, size_t* dc, restart** restarts, size
 	struct dirent* curr_entry;
 	FILE* curr_entry_file;
 	char* filename;
-	size_t count = 0;
 	while ((curr_entry = readdir(restart_dir))) {
 		if (!strcmp(curr_entry->d_name, ".") || !strcmp(curr_entry->d_name, "..")) {
 			continue;
@@ -226,30 +428,32 @@ void read_restart_dir(download** downloads, size_t* dc, restart** restarts, size
 			exit(EXIT_FAILURE);
 		}
 		
-		line = readline(curr_entry_file);
+		char* line = readline(curr_entry_file);
 		*strchr(line, '\n') = '\0';
 		char* show_name = line;
 		
-		char* line = readline(curr_entry_file);
-		int pin = atoi(line);
-		free(line);
+		line = readline(curr_entry_file);
+		*strchr(line, '\n') = '\0';
+		char* pin = line;
 
 		line = readline(curr_entry_file);
-		int id = atoi(line);
-		free(line);
+		*strchr(line, '\n') = '\0';
+		char* id = line;
 		
 		line = readline(curr_entry_file);
 		*strchr(line, '\n') = '\0';
 		char* magnet = line;
 		
-		char* res = handle_one_download(show_name, pin, id, magnet);
+		char* res = handle_one_download(pin, id, magnet);
 		if (res) {
 			add_one_download(downloads, ++dcount, res, show_name);
 			free(magnet);
+			free(pin);
+			free(id);
 		} else {
 			add_one_restart(restarts, ++rcount, pin, id, show_name, magnet);
-			free(response);
 		}
+		free(res);
 
 		if (fclose(curr_entry_file)) {
 			write_error("Couldn't close entry file. Exiting.");
@@ -304,10 +508,10 @@ restart** add_one_restart(restart** restarts, size_t size, char* pin, char* id, 
 	restarts[size]->show_name = show_name;
 	restarts[size]->magnet = magnet;
 
-	return entries;
+	return restarts;
 }
 
-char* handle_one_transfer(const char* show_name, const char* premiumize_pin, const char* premiumize_id, const char* magnet) {
+char* handle_one_download(const char* premiumize_pin, const char* premiumize_id, const char* magnet) {
 	char* temp_name = malloc((strlen(PREM_TEMP) + 1) * sizeof(char));
 	memcpy(temp_name, PREM_TEMP, strlen(PREM_TEMP));
 	temp_name[strlen(PREM_TEMP)] = '\0';
@@ -319,8 +523,7 @@ char* handle_one_transfer(const char* show_name, const char* premiumize_pin, con
 
 	char* post_data = malloc((strlen(PREM_CREATE_DATA) - 6 + strlen(premiumize_pin) + strlen(premiumize_id) + strlen(magnet) + 1) * sizeof(char));
 	sprintf(post_data, PREM_CREATE_DATA, premiumize_id, premiumize_pin, magnet);
-	curl_create_transfer(temp_file, post_data);
-	free(post_data);
+	curl_create_transfer(temp_file, copy_string_memory(PREM_CREATE_LINK), post_data);
 
 	rewind(temp_file);
 	char* line = NULL;
@@ -358,13 +561,13 @@ char* handle_one_transfer(const char* show_name, const char* premiumize_pin, con
 	return ret_val;
 }
 
-void curl_create_transfer(FILE* temp_file, char* post_data) {
+void curl_create_transfer(FILE* temp_file, char* link, char* post_data) {
 	CURL* curl;
 	CURLcode res;
 
 	curl = curl_easy_init();
 	if (curl) {
-		curl_easy_setopt(curl, CURLOPT_URL, PREM_CREATE_LINK);
+		curl_easy_setopt(curl, CURLOPT_URL, link);
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, temp_file);
 
 		curl_easy_setopt(curl, CURLOPT_POST, 1);
@@ -376,6 +579,8 @@ void curl_create_transfer(FILE* temp_file, char* post_data) {
 			exit(EXIT_FAILURE);
 		}
 		curl_easy_cleanup(curl);
+		free(link);
+		free(post_data);
 	}
 }
 

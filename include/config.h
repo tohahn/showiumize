@@ -22,10 +22,10 @@
 #define CONF_KEY_SERIES_FOLDER "series_folder"
 
 typedef struct conf_config {
-	const char* showrss;
-	const char* premiumize_id;
-	const char* premiumize_pin;
-	const char* series_folder;
+	char* showrss;
+	char* premiumize_id;
+	char* premiumize_pin;
+	char* series_folder;
 } conf_config;
 
 conf_config* read_config_file(void);
