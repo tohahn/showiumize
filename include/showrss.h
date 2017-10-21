@@ -1,6 +1,8 @@
 #ifndef SHOWRSS_H
 #define SHOWRSS_H
 
+/** INCLUDES **/
+#include <stdio.h>
 #include "structs.h"
 
 /** DEFINITIONS **/
@@ -17,21 +19,15 @@
 #define TOKEN_RSS_MAGNET_END_CHAR '&'
 //LINKS
 #define LINK_RSS_FEED "https://showrss.info/user/%s.rss"
+//TEMPLATES
+#define TEMPLATE_FEED_FILE "./%s.rss"
 
 /** METHODS **/
-feed_entry** handle_showrss(const char* id);
+rss_entry** handle_showrss(const char* id);
 FILE* download_feed(const char* id);
-feed_entry** read_entries_from_feed(FILE* feed_file);
-feed_entry** read_entries_from_dir(void);
-int rss_extract_number(char* line, const char* tag);
-char* rss_extract_string(char* line, const char* tag, const char start_char, const char end_char);
-feed_entry** rss_add_entry_to_array(feed_entry** entries, size_t size, int show_id, char* show_name, int episode_id, char* magnet_link);
-char* readline(FILE* feed_file);
-feed_entry** compare_entries(feed_entry** feed_items, feed_entry** dir_items);
-void rss_free_array(feed_entry** tofree);
-void write_entries_to_dir(feed_entry** feed_items);
-feed_entry** copy_entry_array(feed_entry** tocopy);
-feed_entry** null_terminate_array(feed_entry** toterminate, size_t size);
-feed_entry** copy_entry(feed_entry** entries, size_t size, int show_id, char* show_name, int episode_id, char* magnet_link);
+rss_entry** read_entries_from_feed(FILE* feed_file);
+rss_entry** read_entries_from_dir(void);
+rss_entry** compare_entries(rss_entry** feed_items, rss_entry** dir_items);
+void write_entries_to_dir(rss_entry** feed_items);
 
 #endif

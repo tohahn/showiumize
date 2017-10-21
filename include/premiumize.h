@@ -1,11 +1,17 @@
 #ifndef PREMIUMIZE_H
 #define PREMIUMIZE_H
 
+/** INCLUDE **/
+#include <stdio.h>
+#include "structs.h"
+
 /** DEFINITIONS **/
 //DIRECTORIES
 #define DIR_PREMIUMIZE_ROOT "./premiumize/"
 #define DIR_PREMIUMIZE_RESTART "./restart/"
 #define DIR_PREMIUMIZE_DOWNLOAD "./download/"
+//FILES
+#define FILE_TEMP_NAME "./PREM_DOWNLOAD_TEMP"
 //TOKENS
 #define TOKEN_PREM_SIZE_START "\"size\":"
 #define TOKEN_PREM_SIZE_END ','
@@ -23,25 +29,19 @@
 #define FORMAT_PREM_DATA_CREATE "customer_id=%s&pin=%s&type=torrent&src=%s"
 #define FORMAT_PREM_DATA_STATUS "customer_id=%s&pin=%s&hash=%s"
 #define FORMAT_CURL "curl -O -J -L -s %s &"
+#define FORMAT_SHOW_FOLDER "%s%s/"
 
 /** METHODS **/
-char* copy_string_memory(const char* tocopy);
-void handle_premiumize(feed_entry** to_download, char* premiumize_pin, char* premiumize_id, char* series_folder);
-void check_existing(download** downloads, size_t* dc, restart** restarts, size_t* rc, char* pin, char* id, char* series_folder);
-void free_download_array(download** tofree);
-void free_restart_array(restart** tofree);
-void write_download_dir(download** unfinished);
-download** check_transfers(download** downloads, char* id, char* pin, char* series_folder);
-unsigned char handle_one_transfer(char* show_name, char* hash, char* id, char* pin, char* series_folder);
-unsigned char start_download(char* show_name, char* line, char* series_folder);
-void read_download_dir(download** downloads, size_t* dc);
-void write_restart_dir(restart** restarts);
-void read_restart_dir(download** downloads, size_t* dc, restart** restarts, size_t* rc);
-download** null_terminate_download_array(download** toterminate, size_t size);
-restart** null_terminate_restart_array(restart** toterminate, size_t size);
-download** add_one_download(download** downloads, size_t size, char* res, char* show_name);
-restart** add_one_restart(restart** restarts, size_t size, char* pin, char* id, char* show_name, char* magnet);
-char* handle_one_download(const char* premiumize_pin, const char* premiumize_id, const char* magnet);
+void handle_premiumize(rss_entry** to_download, char* pin, char* id, char* series_folder);
+void create_transfers_for_feed_items(rss_entry** to_download, prem_download*** downloads_ptr, size_t* dc, prem_restart*** restarts_ptr, size_t* rc, char* pin, char* id);
+char* handle_one_transfer(const char* pin, const char* id, const char* magnet);
+void read_restart_dir(prem_download*** downloads_ptr, size_t* dc, prem_restart*** restarts_ptr, size_t* rc);
+void write_restart_dir(prem_restart** restarts);
+void read_download_dir(prem_download*** downloads_ptr, size_t* dc);
+prem_download** check_transfers(prem_download** downloads, char* id, char* pin, char* series_folder);
+unsigned char handle_one_download(char* series_folder, char* show_name, char* hash, char* id, char* pin);
+unsigned char start_download(char* line, char* series_folder, char* show_name);
+void write_download_dir(prem_download** unfinished);
 void curl_create_transfer(FILE* temp_file, char* link, char* post_data);
 
 #endif

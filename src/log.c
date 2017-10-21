@@ -1,14 +1,21 @@
+/** INCLUDES **/
+//STDLIB
 #include <sys/types.h>
 #include <stdio.h>
 #include <time.h>
-
+#include <stdlib.h>
+#include <stdarg.h>
+//CUSTOM
 #include "log.h"
 #include "definitions.h"
 #include "messages.h"
+#include "utils.h"
 
+/** VARIABLES **/
 unsigned char log_entries = 0;
 FILE *log_first_p, *log_second_p;
 
+/** METHODS **/
 void open_log() {
 	log_first_p = fopen(DIR_LOG FILE_LOG_FIRST, "w");
 	if (!log_first_p) {
@@ -58,7 +65,7 @@ void get_log_time(char* log_time) {
 	time_t now = time(0);
 	sTm = localtime(&now);
 
-	strftime(log_time, LOG_TIME_BUFF_SIZE, LOG_TIME_FORMAT, sTm);
+	strftime(log_time, LOG_TIME_BUFF_SIZE, FORMAT_LOG_TIME, sTm);
 }
 
 void write_message(const char* message, const char* type) {
@@ -68,7 +75,7 @@ void write_message(const char* message, const char* type) {
 	fprintf(log_first_p, "%s %s %s\n", log_time_buff, type, message);
 	fflush(log_first_p);
 
-	if (++log_entries > LOG_MAX_LINES) {
+	if (++log_entries > MAX_LOG_LINES) {
 		rotate_logs();
 	}
 }
@@ -77,15 +84,15 @@ void write_log(const char* message) {
 	write_message(message, LOG_MESSAGE);
 }
 
-void write_log(const char* message, ...) {
+void write_log_var(const char* message, ...) {
 	va_list va;
 	va_start(va, message);
-	write_log(format, va);
+	write_log_var_helper(message, va);
 	va_end(va);
 }
 
-void write_log(const char* message, va_list va) {
-	char* msg = easy_printf(message, va);
+void write_log_var_helper(const char* message, va_list va) {
+	char* msg = easy_printf_helper(message, va);
 	write_message(msg, LOG_MESSAGE);
 	free(msg);
 }
@@ -94,15 +101,15 @@ void write_error(const char* message) {
 	write_message(message, LOG_ERROR);
 }
 
-void write_error(const char* message, ...) {
+void write_error_var(const char* message, ...) {
 	va_list va;
 	va_start(va, message);
-	write_error(format, va);
+	write_error_var_helper(message, va);
 	va_end(va);
 }
 
-void write_error(const char* message, va_list va) {
-	char* msg = easy_printf(message, va);
+void write_error_var_helper(const char* message, va_list va) {
+	char* msg = easy_printf_helper(message, va);
 	write_message(msg, LOG_ERROR);
 	free(msg);
 }

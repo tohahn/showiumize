@@ -6,7 +6,9 @@
 #include <unistd.h>
 #include <string.h>
 
-#include "def.h"
+#include "definitions.h"
+#include "messages.h"
+#include "structs.h"
 #include "log.h"
 #include "config.h"
 #include "showrss.h"
@@ -31,20 +33,20 @@ int main(void) {
 	/* open logs */
 	open_log();
 
-	open("/dev/null", O_RDONLY);
-	open("/dev/null", O_RDWR);
-	open("/dev/null", O_RDWR);
+	open(DEV_NULL, O_RDONLY);
+	open(DEV_NULL, O_RDWR);
+	open(DEV_NULL, O_RDWR);
 
 	/* New SID for child */
 	sid = setsid();
 	if (sid < 0) {
-		write_error("Invalid SID.");
+		write_error(ERROR_SID);
 		exit(EXIT_FAILURE);
 	}
 
 	/* Change current working dir */
-	if ((chdir("/")) < 0) {
-		write_error("Couldn't change working dir.");
+	if ((chdir(ROOT_DIR)) < 0) {
+		write_error(ERROR_WORKING_DIR);
 		exit(EXIT_FAILURE);
 	}
 
@@ -52,8 +54,8 @@ int main(void) {
 
 	unsigned char blub = TRUE;
 	while(blub) {
-		feed_entry** unread = handle_showrss(config->showrss);
-		handle_premiumize(unread, config->premiumize_pin, config->premiumize_id, config->series_folder);
+		rss_entry** unread = handle_showrss(config->showrss);
+		handle_premiumize(unread, config->pin, config->id, config->series_folder);
 		blub = FALSE;
 	}
 }

@@ -13,18 +13,18 @@ typedef struct rss_entry {
 	char* show_name;
 	int episode_id;
 	char* magnet;
-} feed_entry;
+} rss_entry;
 
 typedef struct prem_restart {
 	char* show_name;
 	char* id;
 	char* pin;
 	char* magnet;
-} restart;
+} prem_restart;
 
 typedef struct prem_download {
 	char* show_name;
 	char* hash;
-} download;
+} prem_download;
 
 #endif

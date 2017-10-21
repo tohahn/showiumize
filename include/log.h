@@ -28,10 +28,10 @@ void rotate_logs(void);
 void get_log_time(char* log_time);
 void write_message(const char* message, const char* type);
 void write_log(const char* message);
-void write_log(const char* message, ...);
-void write_log(const char* message, va_list va);
+void write_log_var(const char* message, ...);
+void write_log_var_helper(const char* message, va_list va);
 void write_error(const char* message);
-void write_error(const char* message, ...);
-void write_error(const char* message, va_list va);
+void write_error_var(const char* message, ...);
+void write_error_var_helper(const char* message, va_list va);
 
 #endif
