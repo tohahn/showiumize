@@ -24,7 +24,7 @@ int main(void) {
 	if (pid > 0) {
 		exit(EXIT_SUCCESS);
 	}
-	
+
 	/* u+rw,g+r,o+r */
 	umask(0);
 
@@ -34,7 +34,7 @@ int main(void) {
 	open("/dev/null", O_RDONLY);
 	open("/dev/null", O_RDWR);
 	open("/dev/null", O_RDWR);
-	
+
 	/* New SID for child */
 	sid = setsid();
 	if (sid < 0) {
@@ -47,9 +47,9 @@ int main(void) {
 		write_error("Couldn't change working dir.");
 		exit(EXIT_FAILURE);
 	}
-	
+
 	const conf_config* config = read_config_file();
-	
+
 	unsigned char blub = TRUE;
 	while(blub) {
 		feed_entry** unread = handle_showrss(config->showrss);
