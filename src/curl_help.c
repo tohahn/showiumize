@@ -43,8 +43,6 @@ char* read_curl(char* url)
   chunk.memory = malloc(1);  /* will be grown as needed by the realloc above */
   chunk.size = 0;    /* no data at this point */
 
-  curl_global_init(CURL_GLOBAL_ALL);
-
   /* init the curl session */
   curl_handle = curl_easy_init();
 
@@ -77,9 +75,6 @@ char* read_curl(char* url)
   free(chunk.memory);
   free(url);
 
-  /* we're done with libcurl, so clean it up */
-  curl_global_cleanup();
-
   return ret_val;
 }
 
@@ -92,8 +87,6 @@ char* read_curl_post(char* url, char* post_data)
 
   chunk.memory = malloc(1);  /* will be grown as needed by the realloc above */
   chunk.size = 0;    /* no data at this point */
-
-  curl_global_init(CURL_GLOBAL_ALL);
 
   /* init the curl session */
   curl_handle = curl_easy_init();
@@ -129,9 +122,6 @@ char* read_curl_post(char* url, char* post_data)
   free(chunk.memory);
   free(url);
   free(post_data);
-
-  /* we're done with libcurl, so clean it up */
-  curl_global_cleanup();
 
   return ret_val;
 }
