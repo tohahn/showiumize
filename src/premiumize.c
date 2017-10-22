@@ -42,6 +42,8 @@ void handle_premiumize(rss_entry** to_download, char* pin, char* id, char* serie
 		prem_download_free(unfinished);
 	}
 
+	change_dir(config_folder);
+
 	prem_download_free(collection.downloads);
 	prem_restart_free(collection.restarts);
 	rss_entry_free(to_download);
