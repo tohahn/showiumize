@@ -10,6 +10,7 @@
 //FILES
 #define FILE_CURR_DIR "./%s"
 #define FILE_TEMP "temp_XXXXXX"
+#define FILE_PERMISSIONS 0755
 
 //STUFF
 #define TEMP_FILE_MODE "w"

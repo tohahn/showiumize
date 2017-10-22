@@ -34,7 +34,7 @@ DIR* open_dir(const char* dir_name);
 unsigned char change_dir(const char* dir_name);
 unsigned char close_dir(DIR* dir);
 //BOTH
-unsigned char check_file_dir(const char* path, mode_t mode);
+unsigned char check_file_dir(const char* path, int mode);
 //FILE MANIPULATION
 char* easy_readline(FILE* file, const char* error_message);
 char* easy_readline_var(FILE* file, const char* error_message, ...);

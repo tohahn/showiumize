@@ -9,7 +9,8 @@
 //UTILS
 #define ERROR_MALLOC "Could not allocate memory. Probably no more RAM. Exiting."
 #define ERROR_EASY_SPRINTF "Could not vsprintf. Probably allocated memory was too little."
-#define ERROR_FILE_OPEN "Could not open file %s with mode %s. Missing permissions? Exiting."
+#define ERROR_FILE_OPEN "Could not open file %s with mode %d. Missing permissions? Exiting."
+#define ERROR_FD_OPEN "Could not open file %s with mode %s. Missing permissions? Exiting."
 #define ERROR_FILE_TEMP_OPEN "Could not open temp file with template %s. Missing permissions? Exiting."
 #define ERROR_FILE_CLOSE "Could not close file. Exiting."
 #define ERROR_FILE_REMOVE "Could not remove file %s. Exiting."

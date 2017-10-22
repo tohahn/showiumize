@@ -55,7 +55,7 @@ FILE* download_feed(const char* id) {
 	curl_global_cleanup();
 
 	close_file(feed_file);
-	open_file(feed_filename, FILE_READ_MODE);
+	feed_file = open_file(feed_filename, FILE_READ_MODE);
 
 	free(feed_url);
 	free(feed_filename);
@@ -92,8 +92,9 @@ rss_entry** read_entries_from_feed(FILE* feed_file) {
 }
 
 rss_entry** read_entries_from_dir() {
-	check_file_dir(DIR_SHOWRSS, R_OK | W_OK);
-	make_dir(DIR_SHOWRSS, S_IRWXU | S_IRGRP | S_IROTH | S_IXOTH);
+	if (!check_file_dir(DIR_SHOWRSS, R_OK | W_OK)) {
+		make_dir(DIR_SHOWRSS, FILE_PERMISSIONS);
+	}
 
 	DIR* show_dir = open_dir(DIR_SHOWRSS);
 	change_dir(DIR_SHOWRSS);
@@ -131,6 +132,7 @@ rss_entry** read_entries_from_dir() {
 		close_file(curr_entry_file);
 	}
 	close_dir(show_dir);
+	change_dir(PREVIOUS_DIR);
 
 	return rss_entry_null_terminate(dir_entries, count);
 }
@@ -166,9 +168,10 @@ rss_entry** compare_entries(rss_entry** feed_items, rss_entry** dir_items) {
 }
 
 void write_entries_to_dir(rss_entry** feed_items) {
+	change_dir(DIR_SHOWRSS);
+
 	size_t index = 0;
 	rss_entry* curr;
-	change_dir(DIR_SHOWRSS);
 	while ((curr = feed_items[index++])) {
 		FILE* temp_file = open_temp_file();
 

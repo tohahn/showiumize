@@ -2,8 +2,6 @@
 //STDLIB
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <dirent.h>
 #include <string.h>
 #include <unistd.h>
@@ -30,9 +28,11 @@ conf_config* read_config_file() {
 	config->series_folder = extract_value(key_values, TOKEN_CONF_KEY_SERIES_FOLDER);
 
 	// checking series folder for writability
-	if (check_file_dir(config->series_folder, W_OK)) {
-		make_dir(config->series_folder, DIR_READ_WRITE);
+	if (!check_file_dir(config->series_folder, W_OK)) {
+		make_dir(config->series_folder, FILE_PERMISSIONS);
 	}
+
+	change_config_dir();
 
 	for (int i = 0; i < CONF_VALUES_NUMBER; i++) {
 		free(key_values[CONF_INDEX_KEYS][i]);
@@ -63,12 +63,10 @@ unsigned char change_config_dir() {
 		dir_name = easy_printf(FORMAT_CONF_HOME, conf_home, DIR_CONF_ROOT, DIR_CONF);
 	}
 
-	if (check_file_dir(dir_name, S_IRWXU)) {
-		change_dir(dir_name);
-	} else {
-		exit(EXIT_FAILURE);
+	if (!check_file_dir(dir_name, W_OK | R_OK)) {
+		make_dir(dir_name, FILE_PERMISSIONS);
 	}
-
+	change_dir(dir_name);
 	free(dir_name);
 	return TRUE;
 }
@@ -80,17 +78,18 @@ char*** extract_lines(FILE* conf_file) {
 	key_value[CONF_INDEX_KEYS] = keys;
 
 	char** values = easy_malloc(CONF_VALUES_NUMBER * sizeof(char*));
-	key_value[CONF_VALUES_NUMBER] = values;
+	key_value[CONF_INDEX_VALUES] = values;
 
+	char* newline = NULL;
 	for (int i = 0; i < CONF_VALUES_NUMBER; i++) {
 		char* line = easy_readline_var(conf_file, ERROR_MALFORMED_CONFIG, FILE_CONFIG);
 		char* token = strsep(&line, TOKEN_CONF_SEPARATOR);
-		key_value[CONF_INDEX_KEYS][i] = strdup(token);
+		key_value[CONF_INDEX_KEYS][i] = copy_string_to_heap(token);
 
 		token = strsep(&line, TOKEN_CONF_SEPARATOR);
-		char* newline = strchr(token, '\n');
+		newline = strchr(token, '\n');
 		*newline = '\0';
-		key_value[CONF_VALUES_NUMBER][i] = strdup(token);
+		key_value[CONF_INDEX_VALUES][i] = copy_string_to_heap(token);
 
 		if ((line = strsep(&line, TOKEN_CONF_SEPARATOR))) {
 			write_error_var(ERROR_MALFORMED_CONFIG, FILE_CONFIG);
@@ -105,7 +104,7 @@ char*** extract_lines(FILE* conf_file) {
 
 char* extract_value(char*** key_value, const char* key) {
 	for (int i = 0; i < CONF_VALUES_NUMBER; i++) {
-		if (!strcmp(key, key_value[0][i])) {
+		if (!strcmp(key, key_value[CONF_INDEX_KEYS][i])) {
 			key_value[CONF_INDEX_KEYS][i][0] = '\0';
 			return copy_string_to_heap(key_value[CONF_INDEX_VALUES][i]);
 		}

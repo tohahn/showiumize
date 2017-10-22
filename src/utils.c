@@ -17,8 +17,8 @@
 //FILES
 FILE* open_file(const char* filename, const char* mode) {
   FILE* temp = fopen(filename, mode);
-  if (temp) {
-    write_error_with_error_number_var(ERROR_FILE_OPEN, filename, mode);
+  if (!temp) {
+    write_error_with_error_number_var(ERROR_FD_OPEN, filename, mode);
     exit(EXIT_FAILURE);
   }
   return temp;
@@ -33,7 +33,7 @@ FILE* open_temp_file() {
   }
 	FILE* temp_file = fdopen(fd, TEMP_FILE_MODE);
 	if (!temp_file) {
-    write_error_with_error_number_var(ERROR_FILE_OPEN, temp_name, TEMP_FILE_MODE);
+    write_error_with_error_number_var(ERROR_FD_OPEN, temp_name, TEMP_FILE_MODE);
     exit(EXIT_FAILURE);
 	}
   return temp_file;
@@ -57,7 +57,7 @@ unsigned char remove_file(const char* filename) {
 
 //DIRECTORIES
 unsigned char make_dir(const char* dir_name, mode_t mode) {
-  if (!mkdir(dir_name, mode)) {
+  if (mkdir(dir_name, mode)) {
     write_error_with_error_number_var(ERROR_DIR_CREATE, dir_name, mode);
     exit(EXIT_FAILURE);
   }
@@ -66,7 +66,7 @@ unsigned char make_dir(const char* dir_name, mode_t mode) {
 
 DIR* open_dir(const char* dir_name) {
   DIR* temp = opendir(dir_name);
-  if (temp) {
+  if (!temp) {
     write_error_with_error_number_var(ERROR_DIR_OPEN, dir_name);
     exit(EXIT_FAILURE);
   }
@@ -74,8 +74,7 @@ DIR* open_dir(const char* dir_name) {
 }
 
 unsigned char change_dir(const char* dir_name) {
-  int temp = chdir(dir_name);
-  if (temp) {
+  if (chdir(dir_name)) {
     write_error_with_error_number_var(ERROR_DIR_CHANGE, dir_name);
     exit(EXIT_FAILURE);
   }
@@ -91,7 +90,7 @@ unsigned char close_dir(DIR* dir) {
 }
 
 //BOTH
-unsigned char check_file_dir(const char* path, mode_t mode) {
+unsigned char check_file_dir(const char* path, int mode) {
   if (access(path, mode)) {
     write_error_with_error_number_var(ERROR_PATH_NO_ACCESS, path, mode);
     return FALSE;
@@ -138,7 +137,7 @@ char* easy_readline_var_helper(FILE* file, const char* error_message, va_list va
 //MEMORY
 void* easy_malloc(size_t size) {
   void* memory = malloc(size);
-  if (memory) {
+  if (!memory) {
     write_error(ERROR_MALLOC);
     exit(EXIT_FAILURE);
   }
@@ -157,7 +156,7 @@ char* easy_printf_helper(const char* format, va_list va) {
   //finding out the size of the string
   size_t size = strlen(format) + VALUE_VARARG_SIZE + 1;
   char* string = easy_malloc(size * sizeof(char));
-  if (vsprintf(string, format, va) < 1) {
+  if (vsprintf(string, format, va) < 0) {
     write_error(ERROR_EASY_SPRINTF);
     exit(EXIT_FAILURE);
   }
@@ -344,13 +343,13 @@ void write_error_with_error_number(const char* error_message) {
 void write_error_with_error_number_var(const char* error_message, ...) {
   va_list va;
   va_start(va, error_message);
-   write_error_with_error_number_var_helper(error_message, va);
+  write_error_with_error_number_var_helper(error_message, va);
   va_end(va);
 }
 
 void write_error_with_error_number_var_helper(const char* error_message, va_list va) {
-  char* temp_error = easy_printf(error_message, va);
-  char* error = easy_printf(FORMAT_ERROR_NUMBER, errno);
+  char* temp_error = easy_printf_helper(error_message, va);
+  char* error = easy_printf(FORMAT_ERROR_NUMBER, temp_error, errno);
   free(temp_error);
   write_error(error);
   free(error);
@@ -362,7 +361,7 @@ int extract_number_from_line(char* line, const char* start_string, const char en
 		exit(EXIT_FAILURE);
 	}
 
-	char* start = strstr(line, start_string) + strlen(start_string) + 1;
+	char* start = strstr(line, start_string) + strlen(start_string);
 	char* end = strchr(start, end_char);
 	char number_string[end - start + 1];
 	memcpy(number_string, start, (size_t) end - (size_t) start);
@@ -377,7 +376,7 @@ char* extract_string_from_line(char* line, const char* start_string, const char 
 		exit(EXIT_FAILURE);
 	}
 
-	char* start = strstr(line, start_string) + strlen(start_string) + 1;
+	char* start = strstr(line, start_string) + strlen(start_string);
 	char* end = strchr(start, end_char);
 	char* rss_string = easy_malloc((size_t)(end - start + 1) * sizeof(char));
 	memcpy(rss_string, start, (size_t)(end - start) * sizeof(char));
@@ -391,7 +390,7 @@ char* extract_string_from_line_without_exit(char* line, const char* start_string
 		return NULL;
 	}
 
-	char* start = strstr(line, start_string) + strlen(start_string) + 1;
+	char* start = strstr(line, start_string) + strlen(start_string);
 	char* end = strchr(start, end_char);
 	char* rss_string = easy_malloc((size_t)(end - start + 1) * sizeof(char));
 	memcpy(rss_string, start, (size_t)(end - start) * sizeof(char));
