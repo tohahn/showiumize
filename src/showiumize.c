@@ -13,6 +13,7 @@
 #include "config.h"
 #include "showrss.h"
 #include "premiumize.h"
+#include "curl/curl.h"
 
 int main(void) {
 	pid_t pid, sid;
@@ -52,11 +53,13 @@ int main(void) {
 
 	const conf_config* config = read_config_file();
 
-	unsigned char blab = TRUE;
-	while(blab) {
+	while(TRUE) {
+		curl_global_init(CURL_GLOBAL_ALL);
+		
 		rss_entry** unread = handle_showrss(config->showrss);
 		handle_premiumize(unread, config->pin, config->id, config->series_folder, config->config_folder);
-		blab = FALSE;
-		//sleep(SLEEP_IN_SECONDS);
+
+		curl_global_cleanup();
+		sleep(SLEEP_IN_SECONDS);
 	}
 }
