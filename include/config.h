@@ -30,7 +30,7 @@
 
 /** METHODS **/
 conf_config* read_config_file(void);
-unsigned char change_config_dir(void);
+char* change_config_dir(void);
 char*** extract_lines(FILE* conf_file);
 char* extract_value(char*** key_value, const char* key);
 

@@ -41,21 +41,23 @@ char* easy_readline_var(FILE* file, const char* error_message, ...);
 char* easy_readline_var_helper(FILE* file, const char* error_message, va_list va);
 //MEMORY
 void* easy_malloc(size_t size);
-char* easy_printf(const char* format, ...);
-char* easy_printf_helper(const char* format, va_list va);
+char* easy_printf(const char* format, size_t size, ...);
+char* easy_printf_helper(const char* format, size_t size, va_list va);
+char* easy_printf_unknown(const char* format, ...);
+char* easy_printf_unknown_helper(const char* format, va_list va);
 char* copy_string_to_heap(const char* string);
 //ARRAYS
 //RSS_ENTRY
-rss_entry** rss_entry_add_one(rss_entry** entries, size_t* size, int show_id, const char* show_name, int episode_id, const char* magnet_link);
+rss_entry** rss_entry_add_one(rss_entry** entries, size_t size, int show_id, const char* show_name, int episode_id, const char* magnet_link);
 rss_entry** rss_entry_null_terminate(rss_entry** entries, size_t size);
 rss_entry** rss_entry_copy(rss_entry** tocopy);
 void rss_entry_free(rss_entry** tofree);
 //PREM_RESTART
-prem_restart** prem_restart_add_one(prem_restart** restarts, size_t* size, const char* show_name, const char* id, const char* pin, const char* magnet);
+prem_restart** prem_restart_add_one(prem_restart** restarts, size_t size, const char* show_name, const char* id, const char* pin, const char* magnet);
 prem_restart** prem_restart_null_terminate(prem_restart** restarts, size_t size);
 void prem_restart_free(prem_restart** tofree);
 //PREM_DOWNLOAD
-prem_download** prem_download_add_one(prem_download** downloads, size_t* size, const char* show_name, const char* hash);
+prem_download** prem_download_add_one(prem_download** downloads, size_t size, const char* show_name, const char* hash);
 prem_download** prem_download_null_terminate(prem_download** downloads, size_t size);
 void prem_download_free(prem_download** tofree);
 //VARIOUS

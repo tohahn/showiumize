@@ -36,6 +36,7 @@ FILE* open_temp_file() {
     write_error_with_error_number_var(ERROR_FD_OPEN, temp_name, TEMP_FILE_MODE);
     exit(EXIT_FAILURE);
 	}
+  free(temp_name);
   return temp_file;
 }
 
@@ -144,15 +145,32 @@ void* easy_malloc(size_t size) {
   return memory;
 }
 
-char* easy_printf(const char* format, ...) {
+char* easy_printf(const char* format, size_t size, ...) {
   va_list va;
-  va_start(va, format);
-  char* temp = easy_printf_helper(format, va);
+  va_start(va, size);
+  char* temp = easy_printf_helper(format, size, va);
   va_end(va);
   return temp;
 }
 
-char* easy_printf_helper(const char* format, va_list va) {
+char* easy_printf_helper(const char* format, size_t size, va_list va) {
+  char* string = easy_malloc(size * sizeof(char));
+  if (vsprintf(string, format, va) < 0) {
+    write_error(ERROR_EASY_SPRINTF);
+    exit(EXIT_FAILURE);
+  }
+  return string;
+}
+
+char* easy_printf_unknown(const char* format, ...) {
+  va_list va;
+  va_start(va, format);
+  char* temp = easy_printf_unknown_helper(format, va);
+  va_end(va);
+  return temp;
+}
+
+char* easy_printf_unknown_helper(const char* format, va_list va) {
   //finding out the size of the string
   size_t size = strlen(format) + VALUE_VARARG_SIZE + 1;
   char* string = easy_malloc(size * sizeof(char));
@@ -173,22 +191,20 @@ char* copy_string_to_heap(const char* string) {
 
 //ARRAYS
 //RSS_ENTRY
-rss_entry** rss_entry_add_one(rss_entry** entries, size_t* size, int show_id, const char* show_name, int episode_id, const char* magnet_link) {
-  size_t size_temp = *size;
-  rss_entry** temp = realloc(entries, size_temp * sizeof(rss_entry*));
+rss_entry** rss_entry_add_one(rss_entry** entries, size_t size, int show_id, const char* show_name, int episode_id, const char* magnet_link) {
+  rss_entry** temp = realloc(entries, size * sizeof(rss_entry*));
   if (!temp) {
     write_error(ERROR_MALLOC);
     exit(EXIT_FAILURE);
   }
   entries = temp;
 
-  size_t i = size_temp - 1;
-  entries[i] = easy_malloc(sizeof(rss_entry));
+  entries[--size] = easy_malloc(sizeof(rss_entry));
 
-  entries[i]->show_id = show_id;
-  entries[i]->show_name = copy_string_to_heap(show_name);
-  entries[i]->episode_id = episode_id;
-  entries[i]->magnet = copy_string_to_heap(magnet_link);
+  entries[size]->show_id = show_id;
+  entries[size]->show_name = copy_string_to_heap(show_name);
+  entries[size]->episode_id = episode_id;
+  entries[size]->magnet = copy_string_to_heap(magnet_link);
 
   return entries;
 }
@@ -217,8 +233,7 @@ rss_entry** rss_entry_copy(rss_entry** tocopy) {
 	size_t index = 0;
 	rss_entry* cur;
 	while ((cur = tocopy[index++])) {
-    centries++;
-		copy = rss_entry_add_one(copy, &centries, cur->show_id, cur->show_name, cur->episode_id, cur->magnet);
+		copy = rss_entry_add_one(copy, ++centries, cur->show_id, cur->show_name, cur->episode_id, cur->magnet);
 	}
 	return rss_entry_null_terminate(copy, centries);
 }
@@ -236,22 +251,20 @@ void rss_entry_free(rss_entry** tofree) {
 }
 
 //PREM RESTART
-prem_restart** prem_restart_add_one(prem_restart** restarts, size_t* size, const char* show_name, const char* id, const char* pin, const char* magnet) {
-  size_t size_temp = *size;
-  prem_restart** temp = realloc(restarts, size_temp * sizeof(prem_restart*));
+prem_restart** prem_restart_add_one(prem_restart** restarts, size_t size, const char* show_name, const char* id, const char* pin, const char* magnet) {
+  prem_restart** temp = realloc(restarts, size * sizeof(prem_restart*));
   if (!temp) {
     write_error(ERROR_MALLOC);
     exit(EXIT_FAILURE);
   }
   restarts = temp;
 
-  size_t i = size_temp - 1;
-  restarts[i] = easy_malloc(sizeof(prem_restart));
+  restarts[--size] = easy_malloc(sizeof(prem_restart));
 
-  restarts[i]->show_name = copy_string_to_heap(show_name);
-  restarts[i]->id = copy_string_to_heap(id);
-  restarts[i]->pin = copy_string_to_heap(pin);
-  restarts[i]->magnet = copy_string_to_heap(magnet);
+  restarts[size]->show_name = copy_string_to_heap(show_name);
+  restarts[size]->id = copy_string_to_heap(id);
+  restarts[size]->pin = copy_string_to_heap(pin);
+  restarts[size]->magnet = copy_string_to_heap(magnet);
 
   return restarts;
 }
@@ -286,20 +299,17 @@ void prem_restart_free(prem_restart** tofree) {
 }
 
 //PREM_DOWNLOAD
-prem_download** prem_download_add_one(prem_download** downloads, size_t* size, const char* show_name, const char* hash) {
-  size_t size_temp = *size;
-  prem_download** temp = realloc(downloads, size_temp * sizeof(prem_download*));
+prem_download** prem_download_add_one(prem_download** downloads, size_t size, const char* show_name, const char* hash) {
+  prem_download** temp = realloc(downloads, size * sizeof(prem_download*));
   if (!temp) {
     write_error(ERROR_MALLOC);
     exit(EXIT_FAILURE);
   }
   downloads = temp;
+  downloads[--size] = easy_malloc(sizeof(prem_download));
 
-  size_t i = size_temp - 1;
-  downloads[i] = easy_malloc(sizeof(prem_download));
-
-  downloads[i]->show_name = copy_string_to_heap(show_name);
-  downloads[i]->hash = copy_string_to_heap(hash);
+  downloads[size]->show_name = copy_string_to_heap(show_name);
+  downloads[size]->hash = copy_string_to_heap(hash);
 
   return downloads;
 }
@@ -335,7 +345,8 @@ void prem_download_free(prem_download** tofree) {
 
 //VARIOUS
 void write_error_with_error_number(const char* error_message) {
-  char* error = easy_printf(FORMAT_ERROR_NUMBER, error_message, errno);
+  size_t size = strlen(FORMAT_ERROR_NUMBER) + strlen(error_message) + 5;
+  char* error = easy_printf(FORMAT_ERROR_NUMBER, size, error_message, errno);
   write_error(error);
   free(error);
 }
@@ -348,8 +359,9 @@ void write_error_with_error_number_var(const char* error_message, ...) {
 }
 
 void write_error_with_error_number_var_helper(const char* error_message, va_list va) {
-  char* temp_error = easy_printf_helper(error_message, va);
-  char* error = easy_printf(FORMAT_ERROR_NUMBER, temp_error, errno);
+  char* temp_error = easy_printf_unknown_helper(error_message, va);
+  size_t size = strlen(FORMAT_ERROR_NUMBER) + strlen(temp_error) + 5;
+  char* error = easy_printf(FORMAT_ERROR_NUMBER, size, temp_error, errno);
   free(temp_error);
   write_error(error);
   free(error);
@@ -357,7 +369,8 @@ void write_error_with_error_number_var_helper(const char* error_message, va_list
 
 int extract_number_from_line(char* line, const char* start_string, const char end_char) {
 	if (!(line = strstr((const char*) line, start_string))) {
-		write_error_var(ERROR_PREMATURE_END, start_string);
+    size_t size = strlen(ERROR_PREMATURE_END) + strlen(start_string) + 1;
+		write_error_var(ERROR_PREMATURE_END, size, start_string);
 		exit(EXIT_FAILURE);
 	}
 
@@ -372,7 +385,8 @@ int extract_number_from_line(char* line, const char* start_string, const char en
 
 char* extract_string_from_line(char* line, const char* start_string, const char end_char) {
 	if (!(line = strstr((const char*) line, start_string))) {
-		write_error_var(ERROR_PREMATURE_END, start_string);
+    size_t size = strlen(ERROR_PREMATURE_END) + strlen(start_string) + 1;
+		write_error_var(ERROR_PREMATURE_END, size, start_string);
 		exit(EXIT_FAILURE);
 	}
 

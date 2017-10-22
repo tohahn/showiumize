@@ -13,93 +13,67 @@
 #include "messages.h"
 #include "structs.h"
 #include "utils.h"
-#include "config.h"
 #include "log.h"
 #include "curl_help.h"
 
-void handle_premiumize(rss_entry** to_download, char* pin, char* id, char* series_folder) {
+void handle_premiumize(rss_entry** to_download, char* pin, char* id, char* series_folder, char* config_folder) {
 	if (!check_file_dir(DIR_PREMIUMIZE_ROOT, R_OK | W_OK)) {
 		make_dir(DIR_PREMIUMIZE_ROOT, FILE_PERMISSIONS);
 	}
 	change_dir(DIR_PREMIUMIZE_ROOT);
 
-	prem_restart*** restarts = easy_malloc(sizeof(prem_restart**));
-	*restarts = easy_malloc(sizeof(prem_restart*));
-	size_t* rcount = easy_malloc(sizeof(size_t));
-	*rcount = 0;
-	prem_download*** downloads = easy_malloc(sizeof(prem_download**));
-	*downloads = easy_malloc(sizeof(prem_download*));
-	size_t* dcount = easy_malloc(sizeof(size_t));
-	*dcount = 0;
+	prem_collection collection;
+	collection.restarts = NULL;
+	collection.rcount = 0;
+	collection.downloads = NULL;
+	collection.dcount = 0;
 
-	create_transfers_for_feed_items(to_download, downloads, dcount, restarts, rcount, pin, id);
-	read_restart_dir(downloads, dcount, restarts, rcount);
-	*restarts = prem_restart_null_terminate(*restarts, *rcount);
-	write_restart_dir(*restarts);
-	read_download_dir(downloads, dcount);
-	*downloads = prem_download_null_terminate(*downloads, *dcount);
-	prem_download** unfinished = check_transfers(*downloads, id, pin, series_folder);
-	if (unfinished) {
-		write_download_dir(unfinished);
+	if (to_download) create_transfers_for_feed_items(to_download, &collection, pin, id);
+	read_restart_dir(&collection);
+	collection.restarts = prem_restart_null_terminate(collection.restarts, collection.rcount);
+	if (collection.restarts) write_restart_dir(collection.restarts);
+	read_download_dir(&collection);
+	collection.downloads = prem_download_null_terminate(collection.downloads, collection.dcount);
+	if (collection.downloads) {
+		prem_download** unfinished = check_transfers(collection.downloads, id, pin, series_folder, config_folder);
+		if (unfinished) {
+			write_download_dir(unfinished);
+		}
+		prem_download_free(unfinished);
 	}
 
-	free(dcount);
-	free(rcount);
+	prem_download_free(collection.downloads);
+	prem_restart_free(collection.restarts);
 	rss_entry_free(to_download);
-	prem_download_free(unfinished);
-	prem_download_free(*downloads);
-	free(downloads);
-	prem_restart_free(*restarts);
-	free(restarts);
 }
 
-void create_transfers_for_feed_items(rss_entry** to_download, prem_download*** downloads_ptr, size_t* dc, prem_restart*** restarts_ptr, size_t* rc, char* pin, char* id) {
-	if (!to_download) {
-		return;
-	}
-
-	prem_download** downloads = *downloads_ptr;
-	prem_restart** restarts = *restarts_ptr;
-
+void create_transfers_for_feed_items(rss_entry** to_download, prem_collection* collection, char* pin, char* id) {
 	size_t index = 0;
 	rss_entry* curr;
 	while ((curr = to_download[index++])) {
 		char* response = handle_one_transfer(pin, id, curr->magnet);
 		if (response) {
-			++*dc;
-			downloads = prem_download_add_one(downloads, dc, response, curr->show_name);
-			free(response);
+			collection->downloads = prem_download_add_one(collection->downloads, ++collection->dcount, curr->show_name, response);
 		} else {
-			++*rc;
-			restarts = prem_restart_add_one(restarts, rc, curr->show_name, id, pin, curr->magnet);
+			collection->restarts = prem_restart_add_one(collection->restarts, ++collection->rcount, curr->show_name, id, pin, curr->magnet);
 		}
 		free(response);
 	}
 }
 
 char* handle_one_transfer(const char* pin, const char* id, const char* magnet) {
-	//FILE* temp_file = open_file(FILE_TEMP_NAME, FILE_WRITE_MODE);
-	char* post_data = easy_printf(FORMAT_PREM_DATA_CREATE, id, pin, magnet);
-	char* line = read_curl(copy_string_to_heap(LINK_PREM_CREATE), post_data);
+	size_t size = strlen(FORMAT_PREM_DATA_CREATE) + strlen(id) + strlen(pin) + strlen(magnet) + 1;
+	char* post_data = easy_printf(FORMAT_PREM_DATA_CREATE, size, id, pin, magnet);
+	char* line = read_curl_post(copy_string_to_heap(LINK_PREM_CREATE), post_data);
 
-	//fclose(temp_file);
-	//open_file(FILE_TEMP_NAME, FILE_READ_MODE);
-
-	//char* line = easy_readline(temp_file, ERROR_CREATING_TRANSFER_RESPONSE);
 	char* ret_val = extract_string_from_line_without_exit(line, TOKEN_PREM_HASH_START, TOKEN_PREM_HASH_END);
 
 	free(line);
-	//close_file(temp_file);
-	//remove(FILE_TEMP_NAME);
 
 	return ret_val;
 }
 
-void read_restart_dir(prem_download*** downloads_ptr, size_t* dc, prem_restart*** restarts_ptr, size_t* rc) {
-	prem_download** downloads = *downloads_ptr;
-	prem_restart** restarts = *restarts_ptr;
-	//char cwd[1024];
-	//write_log_var("CWD: %s", getcwd(cwd, (cwd)));
+void read_restart_dir(prem_collection* collection) {
 	if (!check_file_dir(DIR_PREMIUMIZE_RESTART, R_OK | W_OK)) {
 		make_dir(DIR_PREMIUMIZE_RESTART, FILE_PERMISSIONS);
 	}
@@ -111,7 +85,8 @@ void read_restart_dir(prem_download*** downloads_ptr, size_t* dc, prem_restart**
 		if (!strcmp(curr_entry->d_name, CURRENT_DIR) || !strcmp(curr_entry->d_name, PREVIOUS_DIR)) {
 			continue;
 		}
-		char* filename = easy_printf(FILE_CURR_DIR, curr_entry->d_name);
+		size_t size = strlen(FILE_CURR_DIR) + strlen(curr_entry->d_name) + 1;
+		char* filename = easy_printf(FILE_CURR_DIR, size, curr_entry->d_name);
 		FILE* curr_entry_file = open_file(filename, FILE_READ_MODE);
 
 		char* line = easy_readline(curr_entry_file, ERROR_MALFORMED_RESTART_FILE);
@@ -132,11 +107,9 @@ void read_restart_dir(prem_download*** downloads_ptr, size_t* dc, prem_restart**
 
 		char* res = handle_one_transfer(pin, id, magnet);
 		if (res) {
-			++*dc;
-			downloads = prem_download_add_one(downloads, dc, show_name, res);
+			collection->downloads = prem_download_add_one(collection->downloads, ++collection->dcount, show_name, res);
 		} else {
-			++*rc;
-			restarts = prem_restart_add_one(restarts, rc, show_name, id, pin, magnet);
+			collection->restarts = prem_restart_add_one(collection->restarts, ++collection->rcount, show_name, id, pin, magnet);
 		}
 		free(show_name);
 		free(res);
@@ -153,8 +126,10 @@ void read_restart_dir(prem_download*** downloads_ptr, size_t* dc, prem_restart**
 }
 
 void write_restart_dir(prem_restart** restarts) {
-	char cwd[1024];
-	write_log_var("CWD: %s", getcwd(cwd, sizeof(cwd)));
+	if (!restarts) {
+		return;
+	}
+
 	if (!check_file_dir(DIR_PREMIUMIZE_RESTART, R_OK | W_OK)) {
 		make_dir(DIR_PREMIUMIZE_RESTART, FILE_PERMISSIONS);
 	}
@@ -175,9 +150,7 @@ void write_restart_dir(prem_restart** restarts) {
 	change_dir(PREVIOUS_DIR);
 }
 
-void read_download_dir(prem_download*** downloads_ptr, size_t* dc) {
-	prem_download** downloads = *downloads_ptr;
-
+void read_download_dir(prem_collection* collection) {
 	if (!check_file_dir(DIR_PREMIUMIZE_DOWNLOAD, R_OK | W_OK)) {
 		make_dir(DIR_PREMIUMIZE_DOWNLOAD, FILE_PERMISSIONS);
 	}
@@ -189,7 +162,8 @@ void read_download_dir(prem_download*** downloads_ptr, size_t* dc) {
 		if (!strcmp(curr_entry->d_name, CURRENT_DIR) || !strcmp(curr_entry->d_name, PREVIOUS_DIR)) {
 			continue;
 		}
-		char* filename = easy_printf(FILE_CURR_DIR, curr_entry->d_name);
+		size_t size = strlen(FILE_CURR_DIR) + strlen(curr_entry->d_name) + 1;
+		char* filename = easy_printf(FILE_CURR_DIR, size, curr_entry->d_name);
 		FILE* curr_entry_file = open_file(filename, FILE_READ_MODE);
 
 		char* line = easy_readline(curr_entry_file, ERROR_MALFORMED_DOWNLOAD_FILE);
@@ -200,8 +174,7 @@ void read_download_dir(prem_download*** downloads_ptr, size_t* dc) {
 		*strchr(line, '\n') = '\0';
 		char* hash = line;
 
-		++*dc;
-		downloads = prem_download_add_one(downloads, dc, show_name, hash);
+		collection->downloads = prem_download_add_one(collection->downloads, ++collection->dcount, show_name, hash);
 
 		free(show_name);
 		free(hash);
@@ -213,16 +186,15 @@ void read_download_dir(prem_download*** downloads_ptr, size_t* dc) {
 	close_dir(download_dir);
 }
 
-prem_download** check_transfers(prem_download** downloads, char* id, char* pin, char* series_folder) {
+prem_download** check_transfers(prem_download** downloads, char* id, char* pin, char* series_folder, char* config_folder) {
 	prem_download** unfinished = NULL;
 	size_t ucount = 0;
 	prem_download* curr;
 	size_t index = 0;
 	while ((curr = downloads[index++])) {
-		unsigned char res = handle_one_download(series_folder, curr->show_name, curr->hash, id, pin);
+		unsigned char res = handle_one_download(series_folder, curr->show_name, curr->hash, id, pin, config_folder);
 		if (!res) {
-			++ucount;
-			unfinished = prem_download_add_one(unfinished, &ucount, curr->hash, curr->show_name);
+			unfinished = prem_download_add_one(unfinished, ++ucount, curr->show_name, curr->hash);
 		}
 	}
 	if (unfinished) {
@@ -232,33 +204,24 @@ prem_download** check_transfers(prem_download** downloads, char* id, char* pin, 
 	return unfinished;
 }
 
-unsigned char handle_one_download(char* series_folder, char* show_name, char* hash, char* id, char* pin) {
+unsigned char handle_one_download(char* series_folder, char* show_name, char* hash, char* id, char* pin, char* config_folder) {
 	//download status
-	char* data = easy_printf(FORMAT_PREM_DATA_STATUS, hash, id, pin);
-	FILE* temp_file = open_file(FILE_TEMP_NAME, FILE_WRITE_MODE);
-	curl_create_transfer(temp_file, copy_string_to_heap(LINK_PREM_STATUS), data);
-
-	//read result into local storage
-	close_file(temp_file);
-	temp_file = open_file(FILE_TEMP_NAME, FILE_READ_MODE);
-	char* line = easy_readline(temp_file, ERROR_CHECKING_STATUS_RESPONSE);
-
-	//free memory, close file etc.
-	close_file(temp_file);
-	remove(FILE_TEMP_NAME);
+	size_t size = strlen(FORMAT_PREM_DATA_STATUS) + strlen(id) + strlen(pin) + strlen(hash) + 1;
+	char* data = easy_printf(FORMAT_PREM_DATA_STATUS, size, id, pin, hash);
+	char* line = read_curl_post(copy_string_to_heap(LINK_PREM_STATUS), data);
 
 	//handle result
 	unsigned char success = FALSE;
 	char* start = NULL;
 	if ((start = strstr(line, TOKEN_PREM_SIZE_START))) {
-		success = start_download(show_name, start, series_folder);
+		success = start_download(start, series_folder, show_name, config_folder);
 	}
 	free(line);
 
 	return success;
 }
 
-unsigned char start_download(char* line, char* series_folder, char* show_name) {
+unsigned char start_download(char* line, char* series_folder, char* show_name, char* config_folder) {
 	while ((line = strstr(line, TOKEN_PREM_SIZE_START))) {
 		int size = extract_number_from_line(line, TOKEN_PREM_SIZE_START, TOKEN_PREM_SIZE_END);
 		line++;
@@ -267,25 +230,32 @@ unsigned char start_download(char* line, char* series_folder, char* show_name) {
 			break;
 		}
 	}
+	line = strstr(line, TOKEN_PREM_LINK_START);
+	if (strstr(line, TOKEN_PREM_LINK_FALSE)) {
+		line++;
+		line = strstr(line, TOKEN_PREM_LINK_START);
+	}
 	char* link = extract_string_from_line(line, TOKEN_PREM_LINK_START, TOKEN_PREM_LINK_END);
 
 	if (!check_file_dir(series_folder, R_OK | W_OK)) {
 		make_dir(series_folder, FILE_PERMISSIONS);
 	}
-	char* show_folder = easy_printf(FORMAT_SHOW_FOLDER, series_folder, show_name);
+	size_t size = strlen(FORMAT_SHOW_FOLDER) + strlen(series_folder) + strlen(show_name) + 1;
+	char* show_folder = easy_printf(FORMAT_SHOW_FOLDER, size, series_folder, show_name);
 	if (!check_file_dir(show_folder, R_OK | W_OK)) {
 		make_dir(show_folder, FILE_PERMISSIONS);
 	}
 	change_dir(show_folder);
 
-	char* curl_command = easy_printf(FORMAT_CURL, link);
+	size = strlen(FORMAT_CURL) + strlen(link);
+	char* curl_command = easy_printf(FORMAT_CURL, size, link);
 	popen(curl_command, FILE_READ_MODE);
 
 	free(curl_command);
 	free(show_folder);
 	free(link);
 
-	change_config_dir();
+	change_dir(config_folder);
 
 	return TRUE;
 }

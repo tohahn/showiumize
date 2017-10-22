@@ -52,10 +52,11 @@ int main(void) {
 
 	const conf_config* config = read_config_file();
 
-	unsigned char blub = TRUE;
-	while(blub) {
+	unsigned char blab = TRUE;
+	while(blab) {
 		rss_entry** unread = handle_showrss(config->showrss);
-		handle_premiumize(unread, config->pin, config->id, config->series_folder);
-		blub = FALSE;
+		handle_premiumize(unread, config->pin, config->id, config->series_folder, config->config_folder);
+		blab = FALSE;
+		//sleep(SLEEP_IN_SECONDS);
 	}
 }

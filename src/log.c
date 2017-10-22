@@ -46,7 +46,7 @@ void rotate_logs() {
 
 	char ch;
 	while (1) {
-		ch = fgetc(log_first_p);
+		ch = (char) fgetc(log_first_p);
 		if (ch == EOF) {
 			break;
 		} else {
@@ -84,15 +84,28 @@ void write_log(const char* message) {
 	write_message(message, LOG_MESSAGE);
 }
 
-void write_log_var(const char* message, ...) {
+void write_log_var(const char* message, size_t size, ...) {
 	va_list va;
-	va_start(va, message);
-	write_log_var_helper(message, va);
+	va_start(va, size);
+	write_log_var_helper(message, size, va);
 	va_end(va);
 }
 
-void write_log_var_helper(const char* message, va_list va) {
-	char* msg = easy_printf_helper(message, va);
+void write_log_var_helper(const char* message, size_t size, va_list va) {
+	char* msg = easy_printf_helper(message, size, va);
+	write_message(msg, LOG_MESSAGE);
+	free(msg);
+}
+
+void write_log_var_unknown(const char* message, ...) {
+	va_list va;
+	va_start(va, message);
+	write_log_var_unknown_helper(message, va);
+	va_end(va);
+}
+
+void write_log_var_unknown_helper(const char* message, va_list va) {
+	char* msg = easy_printf_unknown_helper(message, va);
 	write_message(msg, LOG_MESSAGE);
 	free(msg);
 }
@@ -101,15 +114,28 @@ void write_error(const char* message) {
 	write_message(message, LOG_ERROR);
 }
 
-void write_error_var(const char* message, ...) {
+void write_error_var(const char* message, size_t size, ...) {
 	va_list va;
-	va_start(va, message);
-	write_error_var_helper(message, va);
+	va_start(va, size);
+	write_error_var_helper(message, size, va);
 	va_end(va);
 }
 
-void write_error_var_helper(const char* message, va_list va) {
-	char* msg = easy_printf_helper(message, va);
+void write_error_var_helper(const char* message, size_t size, va_list va) {
+	char* msg = easy_printf_helper(message, size, va);
+	write_message(msg, LOG_ERROR);
+	free(msg);
+}
+
+void write_error_var_unknown(const char* message, ...) {
+	va_list va;
+	va_start(va, message);
+	write_error_var_unknown_helper(message, va);
+	va_end(va);
+}
+
+void write_error_var_unknown_helper(const char* message, va_list va) {
+	char* msg = easy_printf_unknown_helper(message, va);
 	write_message(msg, LOG_ERROR);
 	free(msg);
 }

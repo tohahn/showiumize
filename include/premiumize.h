@@ -29,19 +29,18 @@
 #define FORMAT_PREM_DATA_CREATE "customer_id=%s&pin=%s&type=torrent&src=%s"
 #define FORMAT_PREM_DATA_STATUS "customer_id=%s&pin=%s&hash=%s"
 #define FORMAT_CURL "curl -O -J -L -s %s &"
-#define FORMAT_SHOW_FOLDER "%s%s/"
+#define FORMAT_SHOW_FOLDER "%s/%s/"
 
 /** METHODS **/
-void handle_premiumize(rss_entry** to_download, char* pin, char* id, char* series_folder);
-void create_transfers_for_feed_items(rss_entry** to_download, prem_download*** downloads_ptr, size_t* dc, prem_restart*** restarts_ptr, size_t* rc, char* pin, char* id);
+void handle_premiumize(rss_entry** to_download, char* pin, char* id, char* series_folder, char* config_folder);
+void create_transfers_for_feed_items(rss_entry** to_download, prem_collection* collection, char* pin, char* id);
 char* handle_one_transfer(const char* pin, const char* id, const char* magnet);
-void read_restart_dir(prem_download*** downloads_ptr, size_t* dc, prem_restart*** restarts_ptr, size_t* rc);
+void read_restart_dir(prem_collection* collection);
 void write_restart_dir(prem_restart** restarts);
-void read_download_dir(prem_download*** downloads_ptr, size_t* dc);
-prem_download** check_transfers(prem_download** downloads, char* id, char* pin, char* series_folder);
-unsigned char handle_one_download(char* series_folder, char* show_name, char* hash, char* id, char* pin);
-unsigned char start_download(char* line, char* series_folder, char* show_name);
+void read_download_dir(prem_collection* collection);
+prem_download** check_transfers(prem_download** downloads, char* id, char* pin, char* series_folder, char* config_folder);
+unsigned char handle_one_download(char* series_folder, char* show_name, char* hash, char* id, char* pin, char* config_folder);
+unsigned char start_download(char* line, char* series_folder, char* show_name, char* config_folder);
 void write_download_dir(prem_download** unfinished);
-void curl_create_transfer(FILE* temp_file, char* link, char* post_data);
 
 #endif

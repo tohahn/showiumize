@@ -45,4 +45,7 @@
 #define ERROR_MALFORMED_RESTART_FILE "Reached premature end of restart file."
 #define ERROR_MALFORMED_DOWNLOAD_FILE "Reached premature end of download file."
 
+//CURL
+#define CURL_FAILED "curl_easy_perform() failed: %s"
+
 #endif

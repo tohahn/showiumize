@@ -24,8 +24,7 @@
 
 /** METHODS **/
 rss_entry** handle_showrss(const char* id);
-FILE* download_feed(const char* id);
-rss_entry** read_entries_from_feed(FILE* feed_file);
+rss_entry** read_entries_from_feed(const char* id);
 rss_entry** read_entries_from_dir(void);
 rss_entry** compare_entries(rss_entry** feed_items, rss_entry** dir_items);
 void write_entries_to_dir(rss_entry** feed_items);

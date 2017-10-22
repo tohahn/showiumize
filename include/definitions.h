@@ -15,6 +15,7 @@
 //STUFF
 #define TEMP_FILE_MODE "w"
 #define DEV_NULL "/dev/null"
+#define SLEEP_IN_SECONDS 1800
 
 //FORMATS
 #define FORMAT_NUMBER "%d\n"

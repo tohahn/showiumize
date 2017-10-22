@@ -10,7 +10,7 @@ LIBS=-lcurl
 _DEPS = curl_help.h definitions.h messages.h structs.h utils.h log.h config.h showrss.h premiumize.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = utils.o showiumize.o premiumize.o showrss.o config.o log.o
+_OBJ = curl_help.o utils.o showiumize.o premiumize.o showrss.o config.o log.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 
