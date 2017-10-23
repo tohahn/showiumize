@@ -10,8 +10,8 @@
 #define DIR_SHOWRSS "./showRSS/"
 //TOKENS
 #define TOKEN_RSS_SHOW_ID "<tv:show_id>"
-#define TOKEN_RSS_EPISODE_ID "<tv:external_id>"
 #define TOKEN_RSS_SHOW_NAME "<tv:show_name>"
+#define TOKEN_RSS_EPISODE_ID "<tv:episode_id>"
 #define TOKEN_RSS_MAGNET_LINK "<enclosure url=\""
 #define TOKEN_RSS_START_CHAR '>'
 #define TOKEN_RSS_END_CHAR '<'
