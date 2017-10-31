@@ -24,8 +24,6 @@ rss_entry** handle_showrss(const char* id) {
 	rss_entry_free(feed_items);
 	rss_entry_free(dir_items);
 
-	change_dir(PREVIOUS_DIR);
-
 	return unread;
 }
 
@@ -151,4 +149,6 @@ void write_entries_to_dir(rss_entry** feed_items) {
 
 		close_file(temp_file);
 	}
+
+	change_dir(PREVIOUS_DIR);
 }

@@ -17,6 +17,7 @@
 #include "curl_help.h"
 
 void handle_premiumize(rss_entry** to_download, char* pin, char* id, char* series_folder, char* config_folder) {
+	change_dir(config_folder);
 	if (!check_file_dir(DIR_PREMIUMIZE_ROOT, R_OK | W_OK)) {
 		make_dir(DIR_PREMIUMIZE_ROOT, FILE_PERMISSIONS);
 	}
@@ -41,7 +42,6 @@ void handle_premiumize(rss_entry** to_download, char* pin, char* id, char* serie
 		}
 		prem_download_free(unfinished);
 	}
-
 	change_dir(config_folder);
 
 	prem_download_free(collection.downloads);
