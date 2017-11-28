@@ -80,7 +80,6 @@ void read_restart_dir(prem_collection* collection) {
 		make_dir(DIR_PREMIUMIZE_RESTART, FILE_PERMISSIONS);
 	}
 	DIR* restart_dir = open_dir(DIR_PREMIUMIZE_RESTART);
-	change_dir(DIR_PREMIUMIZE_RESTART);
 
 	struct dirent* curr_entry;
 	while ((curr_entry = readdir(restart_dir))) {
@@ -124,7 +123,6 @@ void read_restart_dir(prem_collection* collection) {
 		free(filename);
 	}
 	close_dir(restart_dir);
-	change_dir(PREVIOUS_DIR);
 }
 
 void write_restart_dir(prem_restart** restarts) {
